@@ -1,0 +1,11 @@
+.zed/
+
+# Per-language build output. Each slice is published from its own source
+# subtree, so none of this may be present when `zed publish` reads a target dir.
+node_modules/
+__pycache__/
+*.egg-info/
+dist/
+build/
+target/
+Cargo.lock

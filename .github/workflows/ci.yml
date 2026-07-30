@@ -1,0 +1,149 @@
+name: package CI
+
+# polyglot-lib is one repo that publishes four packages, so the thing worth
+# checking here is the seam between them: every [targets] entry must point at a
+# real subtree whose *native* manifest agrees with the zed manifest, and each
+# language slice must stand on its own -- no cross-language imports, because
+# each one ships as a separate artifact with none of the others beside it.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Validate workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/ci.yml
+
+      - name: Every target resolves to a subtree whose manifest agrees
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import tomllib
+          from pathlib import Path
+
+          with Path(".zpkg.toml").open("rb") as handle:
+              zed = tomllib.load(handle)
+          package = zed["package"]
+          targets = zed["targets"]
+
+          assert package["org"] == "zedtest", package["org"]
+          assert package["name"] == "polyglot-lib", package["name"]
+          version = package["version"]
+
+          expected = {"nodejs", "python", "golang", "rust"}
+          assert set(targets) == expected, f"target drift: {sorted(targets)}"
+
+          # Each target's directory must exist and be non-empty; a target
+          # pointing at nothing would publish an empty package rather than fail.
+          for name, target in targets.items():
+              directory = Path(target["dir"])
+              assert directory.is_dir(), f"{name}: missing dir {directory}"
+              assert any(directory.rglob("*")), f"{name}: {directory} is empty"
+
+          # The native manifest of each slice must carry the same version as the
+          # zed manifest, or consumers get a package whose ecosystem metadata
+          # disagrees with the artifact they were handed.
+          node = json.loads(Path(targets["nodejs"]["dir"], "package.json").read_text())
+          assert node["name"] == f"@{package['org']}/polyglot-lib", node["name"]
+          assert node["version"] == version, node["version"]
+          assert node["license"] == package["license"]
+
+          with Path(targets["python"]["dir"], "pyproject.toml").open("rb") as handle:
+              python = tomllib.load(handle)["project"]
+          assert python["version"] == version, python["version"]
+
+          with Path(targets["rust"]["dir"], "Cargo.toml").open("rb") as handle:
+              rust = tomllib.load(handle)["package"]
+          assert rust["version"] == version, rust["version"]
+          assert rust["license"] == package["license"]
+
+          go_mod = Path(targets["golang"]["dir"], "go.mod").read_text()
+          assert "module github.com/zed-pkg-test/polyglot-lib/go" in go_mod, go_mod
+          PY
+
+      - name: No slice reaches into another slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Each language is published as its own artifact, re-rooted at its own
+          # subtree. A relative import that climbs out of a slice resolves fine
+          # in this repo and breaks the moment the package is installed, so it
+          # has to fail here instead.
+          if grep -rn -E '\.\./(node|python|go|rust)/' node python go rust; then
+            echo "::error::a language slice imports across subtrees" >&2
+            exit 1
+          fi
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v6
+        with:
+          node-version: 22
+
+      - name: Node slice
+        working-directory: node
+        run: |
+          set -euo pipefail
+          node -e '
+            const lib = require("./index.js");
+            if (lib.LANGUAGE !== "nodejs") throw new Error(`got ${lib.LANGUAGE}`);
+            if (lib.greet("ci") !== "hello ci from polyglot-lib/node") {
+              throw new Error(lib.greet("ci"));
+            }
+          '
+
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6
+        with:
+          python-version: "3.12"
+
+      - name: Python slice
+        working-directory: python
+        run: |
+          set -euo pipefail
+          python -c '
+          import polyglot_lib
+          assert polyglot_lib.LANGUAGE == "python", polyglot_lib.LANGUAGE
+          assert polyglot_lib.greet("ci") == "hello ci from polyglot-lib/python"
+          '
+          python -m pip install --quiet build
+          python -m build --wheel --outdir "$RUNNER_TEMP/py-dist"
+
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+        with:
+          go-version: "1.22"
+          cache: false
+
+      - name: Go slice
+        working-directory: go
+        run: |
+          set -euo pipefail
+          go vet ./...
+          go build ./...
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust slice
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo build
+          cargo test

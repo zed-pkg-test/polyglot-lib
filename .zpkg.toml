@@ -1,0 +1,43 @@
+[package]
+org = "zedtest"
+name = "polyglot-lib"
+version = "0.1.0"
+description = "One repo, four languages: the polyglot publish/install test fixture"
+license = "MIT"
+keywords = ["test", "polyglot", "fixture"]
+
+[package.repository]
+vcs = "git"
+url = "https://github.com/zed-pkg-test/polyglot-lib"
+
+[publish]
+include_readme = true
+tag_format = "v{version}"
+
+# One target per language subtree. `zed publish` fans this out to four
+# independently installable packages:
+#
+#   zedtest/polyglot-lib-nodejs   <- node/    (npm)
+#   zedtest/polyglot-lib-python   <- python/  (pypi)
+#   zedtest/polyglot-lib-golang   <- go/      (gomod)
+#   zedtest/polyglot-lib-rust     <- rust/    (cargo)
+#
+# The apps in this org consume one each and prove two things CI can check:
+# the right package installs and its native toolchain resolves it, and the
+# wrong one is refused rather than silently landing unusable files.
+
+[targets.nodejs]
+dir = "node"
+adapter = "node"
+
+[targets.python]
+dir = "python"
+adapter = "python"
+
+[targets.golang]
+dir = "go"
+adapter = "go"
+
+[targets.rust]
+dir = "rust"
+adapter = "rust"

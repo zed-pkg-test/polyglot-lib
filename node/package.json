@@ -1,0 +1,8 @@
+{
+  "name": "@zedtest/polyglot-lib",
+  "version": "0.1.0",
+  "description": "Node slice of the polyglot test library",
+  "license": "MIT",
+  "main": "index.js",
+  "type": "commonjs"
+}
