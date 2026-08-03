@@ -1,0 +1,37 @@
+name: polyglot source contract
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify four target packages and native markers
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          with Path('.zpkg.toml').open('rb') as f:
+              manifest = tomllib.load(f)
+          targets = manifest['targets']
+          assert list(targets) == ['nodejs', 'python', 'golang', 'rust']
+          markers = {
+              'nodejs': 'package.json',
+              'python': 'pyproject.toml',
+              'golang': 'go.mod',
+              'rust': 'Cargo.toml',
+          }
+          for name, marker in markers.items():
+              assert Path(targets[name]['dir'], marker).is_file(), (name, marker)
+          PY
