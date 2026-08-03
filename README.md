@@ -15,36 +15,26 @@ subtree each; `zed publish` fans that out:
 | `rust` | [`rust/`](rust/) | `zedtest/polyglot-lib-rust` | cargo |
 
 One version in the repo, four packages on the wire. Each artifact is re-rooted at
-its own subtree and carries none of the others, so a Go consumer downloads Go
-bytes only:
+its own subtree and carries none of the others.
 
-```console
-$ zed pack
-packed zedtest/polyglot-lib-golang@0.1.0 (target golang)
-  sha256 06d8407f…   size 613 B (4 files)
-packed zedtest/polyglot-lib-nodejs@0.1.0 (target nodejs)
-  sha256 ac5af270…   size 733 B (4 files)
-…
-```
+## Two-source consumer matrix
 
-Each published artifact's derived manifest declares what it is for
-(`language = "golang"`, `ecosystem = "gomod"`), which is what lets a consumer's
-`zed install` refuse the wrong one:
+DEN-1514 combines this language-specific source repository with the universal
+`zedtest/shared-schema` package. Three heterogeneous projects install both:
 
-```console
-$ zed install    # in an npm project, having asked for the golang package
-error: `zedtest/polyglot-lib-golang` targets the `gomod` ecosystem, but this project looks like `npm`
-  try instead: zedtest/polyglot-lib-nodejs
-  if this is deliberate, re-run with --allow-ecosystem-mismatch
-```
+- [`polyglot-node-app`](https://github.com/zed-pkg-test/polyglot-node-app) — Node CLI-style consumer
+- [`polyglot-go-app`](https://github.com/zed-pkg-test/polyglot-go-app) — Go worker/service-style consumer
+- [`python-app`](https://github.com/zed-pkg-test/python-app) — Python API/application-style consumer
 
-## Consumers
+Each consumer executes its native `polyglot-lib` slice and validates the same
+installed JSON Schema bytes. CI publishes both sources to a hermetic `file://`
+registry, so there are no public registry writes, credentials, or mutable tags.
 
-- [`polyglot-node-app`](https://github.com/zed-pkg-test/polyglot-node-app) — takes `-nodejs` alongside npm
-- [`polyglot-go-app`](https://github.com/zed-pkg-test/polyglot-go-app) — takes `-golang` via a `go.mod` replace
+## Ecosystem isolation
 
-Both run the whole loop in GitHub Actions against a hermetic `file://` registry:
-no server, no secrets.
+Each published artifact's derived manifest declares its language/ecosystem. A
+consumer therefore refuses the wrong slice unless the caller explicitly opts
+into an ecosystem mismatch.
 
 ## License
 
