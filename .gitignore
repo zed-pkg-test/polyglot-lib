@@ -9,3 +9,7 @@ dist/
 build/
 target/
 Cargo.lock
+tmp
+temp
+tmp/worktrees
+temp/worktrees
