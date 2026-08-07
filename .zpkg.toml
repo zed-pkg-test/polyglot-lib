@@ -41,3 +41,37 @@ adapter = "go"
 [targets.rust]
 dir = "rust"
 adapter = "rust"
+
+# Native registry routes. These say only *where* each slice is mirrored to;
+# the native manifest in each target root stays authoritative for the package
+# name and version, and `zed release plan` cross-checks the two.
+#
+# The version is deliberately absent here. `zed release --channel rc` resolves
+# it per host, because no two of these agree on how a candidate is spelled:
+#
+#   npm        0.1.0-rc.1   plus a dist-tag that is not `latest`
+#   PyPI       0.1.0rc1     PEP 440 — the npm spelling is invalid here
+#   crates.io  0.1.0-rc.1   prerelease only; crates.io has no channel
+#   Go proxy   v0.1.0-rc.1  a VCS tag, not an upload
+#
+# That divergence is the point of this fixture: one `--channel` flag has to
+# produce four different destinations from one reviewed commit.
+
+[targets.nodejs.native]
+registry = "npm"
+package = "@zedtest/polyglot-lib"
+
+[targets.python.native]
+registry = "pypi"
+package = "zedtest-polyglot-lib"
+
+[targets.rust.native]
+registry = "crates-io"
+package = "polyglot-lib"
+
+[targets.golang.native]
+registry = "go-modules"
+package = "github.com/zed-pkg-test/polyglot-lib/go"
+# A Go module below the repository root resolves from a tag carrying its
+# directory prefix, so this one cannot use the plain `v{version}` root tag.
+tag_format = "go/v{version}"
