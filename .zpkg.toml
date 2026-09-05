@@ -17,29 +17,29 @@ tag_format = "v{version}"
 # One target per language subtree. `zed publish` fans this out to four
 # independently installable packages:
 #
-#   zedtest/polyglot-lib-nodejs   <- node/    (npm)
-#   zedtest/polyglot-lib-python   <- python/  (pypi)
-#   zedtest/polyglot-lib-golang   <- go/      (gomod)
-#   zedtest/polyglot-lib-rust     <- rust/    (cargo)
+#   zedtest/polyglot-lib-nodejs   <- langs/node/    (npm)
+#   zedtest/polyglot-lib-python   <- langs/python/  (pypi)
+#   zedtest/polyglot-lib-golang   <- langs/go/      (gomod)
+#   zedtest/polyglot-lib-rust     <- langs/rust/    (cargo)
 #
 # The apps in this org consume one each and prove two things CI can check:
 # the right package installs and its native toolchain resolves it, and the
 # wrong one is refused rather than silently landing unusable files.
 
 [targets.nodejs]
-dir = "node"
+dir = "langs/node"
 adapter = "node"
 
 [targets.python]
-dir = "python"
+dir = "langs/python"
 adapter = "python"
 
 [targets.golang]
-dir = "go"
+dir = "langs/go"
 adapter = "go"
 
 [targets.rust]
-dir = "rust"
+dir = "langs/rust"
 adapter = "rust"
 
 # Native registry routes. These say only *where* each slice is mirrored to;
@@ -71,7 +71,7 @@ package = "polyglot-lib"
 
 [targets.golang.native]
 registry = "go-modules"
-package = "github.com/zed-pkg-test/polyglot-lib/go"
+package = "github.com/zed-pkg-test/polyglot-lib/langs/go"
 # A Go module below the repository root resolves from a tag carrying its
 # directory prefix, so this one cannot use the plain `v{version}` root tag.
-tag_format = "go/v{version}"
+tag_format = "langs/go/v{version}"

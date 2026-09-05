@@ -14,7 +14,7 @@
     "install": "npm i -g eslint typescript-eslint"
   },
   "scripts": {
-    "lint:ores": "if [ -f ../.ores-lint/lint.sh ]; then sh ../.ores-lint/lint.sh; else echo 'ores-lint not installed'; fi",
+    "lint:ores": "if [ -f ../../.ores-lint/lint.sh ]; then sh ../../.ores-lint/lint.sh; else echo 'ores-lint not installed'; fi",
     "prepublishOnly": "npm run lint:ores"
   }
 }
