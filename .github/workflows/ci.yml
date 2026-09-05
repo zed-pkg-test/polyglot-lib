@@ -47,7 +47,7 @@ jobs:
           with Path(targets['rust']['dir'], 'Cargo.toml').open('rb') as handle:
               rust = tomllib.load(handle)['package']
           assert rust['version'] == version and rust['license'] == package['license']
-          assert 'module github.com/zed-pkg-test/polyglot-lib/go' in Path(targets['golang']['dir'], 'go.mod').read_text()
+          assert 'module github.com/zed-pkg-test/polyglot-lib/langs/go' in Path(targets['golang']['dir'], 'go.mod').read_text()
           PY
       - name: No slice reaches into another slice
         run: |
@@ -60,7 +60,7 @@ jobs:
         with:
           node-version: 22
       - name: Node slice
-        working-directory: node
+        working-directory: langs/node
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -72,7 +72,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Python slice
-        working-directory: python
+        working-directory: langs/python
         run: |
           set -euo pipefail
           python -c 'import polyglot_lib; assert polyglot_lib.LANGUAGE == "python"; assert polyglot_lib.greet("ci") == "hello ci from polyglot-lib/python"'
@@ -83,13 +83,13 @@ jobs:
           go-version: '1.22'
           cache: false
       - name: Go slice
-        working-directory: go
+        working-directory: langs/go
         run: |
           go vet ./...
           go build ./...
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
       - name: Rust slice
-        working-directory: rust
+        working-directory: langs/rust
         run: |
           cargo build
           cargo test
