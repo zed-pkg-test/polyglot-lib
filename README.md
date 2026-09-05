@@ -9,10 +9,10 @@ subtree each; `zed publish` fans that out:
 
 | Target | Source | Published package | Ecosystem |
 | --- | --- | --- | --- |
-| `nodejs` | [`node/`](node/) | `zedtest/polyglot-lib-nodejs` | npm |
-| `python` | [`python/`](python/) | `zedtest/polyglot-lib-python` | pypi |
-| `golang` | [`go/`](go/) | `zedtest/polyglot-lib-golang` | gomod |
-| `rust` | [`rust/`](rust/) | `zedtest/polyglot-lib-rust` | cargo |
+| `nodejs` | [`langs/node/`](langs/node/) | `zedtest/polyglot-lib-nodejs` | npm |
+| `python` | [`langs/python/`](langs/python/) | `zedtest/polyglot-lib-python` | pypi |
+| `golang` | [`langs/go/`](langs/go/) | `zedtest/polyglot-lib-golang` | gomod |
+| `rust` | [`langs/rust/`](langs/rust/) | `zedtest/polyglot-lib-rust` | cargo |
 
 One version in the repo, four packages on the wire. Each artifact is re-rooted at
 its own subtree and carries none of the others.
