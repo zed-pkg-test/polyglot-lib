@@ -15,6 +15,7 @@ mod flags2env_submodule_source_hygiene;
 mod infra_policy;
 mod infra_provider_state;
 mod nested_peer_contracts;
+mod oauth_provider_contract;
 mod org;
 mod package;
 mod repository;
@@ -42,7 +43,8 @@ use crate::model::CommandReport;
 
 /// Audit one local repository tree, recursively inspect independently authored
 /// TypeSpec/JSON Schema peers, enforce separation between editable authorities
-/// and generated TJSV comparison evidence, require symmetric fail-closed TJSV
+/// and generated TJSV comparison evidence, validate OAuth/OIDC provider source,
+/// workflow and `*-test` evidence boundaries, require symmetric fail-closed TJSV
 /// drift controls plus a full compiler/emitter/comparison/differential `tjsv
 /// check` for every complete peer pair, require internally consistent immutable
 /// TJSV workflow revisions, reject cross-step TJSV evidence stitching, reject
@@ -60,6 +62,7 @@ pub fn audit_repository(options: &RepositoryAuditOptions) -> CommandReport {
     let report = contract_generated_evidence::augment_contract_generated_evidence_audit(
         options, report,
     );
+    let report = oauth_provider_contract::augment_oauth_provider_contract_audit(options, report);
     let report =
         tjsv_bidirectional_drift::augment_tjsv_bidirectional_drift_audit(options, report);
     let report = tjsv_full_check::augment_tjsv_full_check_audit(options, report);
