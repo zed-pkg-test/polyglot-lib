@@ -102,6 +102,7 @@ pub mod model {
 
 pub mod audit {
     use super::PathBuf;
+    use crate::model::CommandReport;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct RepositoryAuditOptions {
@@ -112,5 +113,13 @@ pub mod audit {
 
     mod tjsv_workflow_revision {
         include!("tjsv_workflow_revision.rs");
+    }
+
+    #[must_use]
+    pub fn certify_tjsv_workflow_revision(options: &RepositoryAuditOptions) -> CommandReport {
+        tjsv_workflow_revision::augment_tjsv_workflow_revision_audit(
+            options,
+            CommandReport::new("certificate audit repository"),
+        )
     }
 }
