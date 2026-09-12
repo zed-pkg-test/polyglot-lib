@@ -31,16 +31,16 @@ struct ExecutionFile {
     workflow: bool,
 }
 
-/// Reject peer-authority coverage that is assembled from unrelated workflow
-/// steps instead of one executable TJSV admission step.
+/// Reject peer-authority coverage assembled from unrelated workflow steps or
+/// unrelated shell commands inside one `run:` step.
 ///
 /// TypeSpec and Draft 2020-12 JSON Schema remain independent, first-class
 /// authored authorities. TJSV transpiles TypeSpec through the official emitter
 /// to generated Schema B and compares that evidence with independently authored
 /// Schema A. This audit only strengthens the repository-owned wiring proof: the
 /// command/action, both authored paths, parity receipt destination, and generated
-/// Schema-B destination must coexist in one workflow step. Non-workflow scripts
-/// keep their existing file-level interpretation.
+/// Schema-B destination must coexist in one atomic workflow action or shell
+/// command. Non-workflow scripts keep their existing file-level interpretation.
 pub(super) fn augment_tjsv_invocation_scope_audit(
     options: &RepositoryAuditOptions,
     mut report: CommandReport,
@@ -50,6 +50,8 @@ pub(super) fn augment_tjsv_invocation_scope_audit(
         report.insert_metadata("tjsvInvocationScopePairCount", json!(0));
         report.insert_metadata("tjsvInvocationScopedPairCount", json!(0));
         report.insert_metadata("tjsvInvocationStitchedPairCount", json!(0));
+        report.insert_metadata("tjsvInvocationCommandScopedPairCount", json!(0));
+        report.insert_metadata("tjsvInvocationCommandStitchedPairCount", json!(0));
         return report.finalize();
     }
 
@@ -62,43 +64,70 @@ pub(super) fn augment_tjsv_invocation_scope_audit(
 
     let mut scoped_pair_count = 0usize;
     let mut stitched_pair_count = 0usize;
+    let mut command_scoped_pair_count = 0usize;
+    let mut command_stitched_pair_count = 0usize;
 
     for directory in pairs {
         let typespec = format!("{directory}/{TYPESPEC_FILE}");
         let schema = format!("{directory}/{JSON_SCHEMA_FILE}");
-        let mut scoped_files = Vec::<&str>::new();
-        let mut stitched_files = Vec::<&str>::new();
+        let mut atomic_files = Vec::<&str>::new();
+        let mut command_stitched_files = Vec::<&str>::new();
+        let mut cross_step_files = Vec::<&str>::new();
 
         for file in &execution_files {
             if !invocation_covers_pair(&file.text, &typespec, &schema) {
                 continue;
             }
 
-            let scoped = if file.workflow {
-                yaml_step_blocks(&file.text)
-                    .iter()
-                    .any(|block| invocation_covers_pair(block, &typespec, &schema))
-            } else {
-                true
-            };
+            if !file.workflow {
+                atomic_files.push(file.path.as_str());
+                continue;
+            }
 
-            if scoped {
-                scoped_files.push(file.path.as_str());
+            let covering_steps = yaml_step_blocks(&file.text)
+                .into_iter()
+                .filter(|block| invocation_covers_pair(block, &typespec, &schema))
+                .collect::<Vec<_>>();
+
+            if covering_steps.is_empty() {
+                cross_step_files.push(file.path.as_str());
+                continue;
+            }
+
+            if covering_steps
+                .iter()
+                .any(|block| step_has_atomic_invocation(block, &typespec, &schema))
+            {
+                atomic_files.push(file.path.as_str());
             } else {
-                stitched_files.push(file.path.as_str());
+                command_stitched_files.push(file.path.as_str());
             }
         }
 
-        if !scoped_files.is_empty() {
+        if !atomic_files.is_empty() {
             scoped_pair_count += 1;
-        } else if !stitched_files.is_empty() {
+            command_scoped_pair_count += 1;
+        } else if !command_stitched_files.is_empty() {
+            scoped_pair_count += 1;
+            command_stitched_pair_count += 1;
+            report.push(
+                Finding::error(
+                    "tjsv-full-check-cross-command-stitching",
+                    format!(
+                        "peer authorities {typespec} and {schema} appear covered within one workflow step only because TJSV command and authority/evidence tokens are distributed across separate shell commands in {}; one atomic shell command must contain the full fail-closed admission wiring",
+                        command_stitched_files.join(", ")
+                    ),
+                )
+                .with_target(directory),
+            );
+        } else if !cross_step_files.is_empty() {
             stitched_pair_count += 1;
             report.push(
                 Finding::error(
                     "tjsv-full-check-cross-step-stitching",
                     format!(
                         "peer authorities {typespec} and {schema} appear covered only because TJSV command/action and authority/evidence tokens are distributed across separate workflow steps in {}; one step must contain the full fail-closed admission wiring",
-                        stitched_files.join(", ")
+                        cross_step_files.join(", ")
                     ),
                 )
                 .with_target(directory),
@@ -108,6 +137,14 @@ pub(super) fn augment_tjsv_invocation_scope_audit(
 
     report.insert_metadata("tjsvInvocationScopedPairCount", json!(scoped_pair_count));
     report.insert_metadata("tjsvInvocationStitchedPairCount", json!(stitched_pair_count));
+    report.insert_metadata(
+        "tjsvInvocationCommandScopedPairCount",
+        json!(command_scoped_pair_count),
+    );
+    report.insert_metadata(
+        "tjsvInvocationCommandStitchedPairCount",
+        json!(command_stitched_pair_count),
+    );
     report.finalize()
 }
 
@@ -299,6 +336,96 @@ fn yaml_step_blocks(text: &str) -> Vec<String> {
     blocks
 }
 
+fn step_has_atomic_invocation(step: &str, typespec: &str, schema: &str) -> bool {
+    if !invocation_covers_pair(step, typespec, schema) {
+        return false;
+    }
+
+    let executable = executable_text(step);
+    let lower = executable.to_ascii_lowercase();
+    if contains_immutably_pinned_tjsv_action(&lower) {
+        return true;
+    }
+
+    shell_command_blocks(step)
+        .iter()
+        .any(|command| invocation_covers_pair(command, typespec, schema))
+}
+
+fn shell_command_blocks(step: &str) -> Vec<String> {
+    let lines = step.lines().collect::<Vec<_>>();
+    for (index, line) in lines.iter().enumerate() {
+        let trimmed = line.trim_start();
+        let field = trimmed.strip_prefix("- ").unwrap_or(trimmed);
+        let Some(rest) = field.strip_prefix("run:") else {
+            continue;
+        };
+        let rest = rest.trim();
+        if !rest.is_empty() && !rest.starts_with('|') && !rest.starts_with('>') {
+            return vec![rest.to_owned()];
+        }
+
+        let run_indent = line.len().saturating_sub(trimmed.len());
+        let mut body = Vec::<&str>::new();
+        for following in lines.iter().skip(index + 1) {
+            let following_trimmed = following.trim_start();
+            if following_trimmed.is_empty() {
+                body.push("");
+                continue;
+            }
+            let indent = following.len().saturating_sub(following_trimmed.len());
+            if indent <= run_indent {
+                break;
+            }
+            body.push(following_trimmed);
+        }
+
+        if rest.starts_with('>') {
+            let folded = body
+                .into_iter()
+                .filter(|line| !line.trim_start().starts_with('#'))
+                .collect::<Vec<_>>()
+                .join(" ");
+            return (!folded.trim().is_empty())
+                .then(|| vec![folded])
+                .unwrap_or_default();
+        }
+
+        return logical_shell_commands(&body.join("\n"));
+    }
+    Vec::new()
+}
+
+fn logical_shell_commands(script: &str) -> Vec<String> {
+    let mut commands = Vec::<String>::new();
+    let mut current = String::new();
+
+    for raw in script.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let continuation = line.ends_with('\\') && !line.ends_with("\\\\");
+        let fragment = if continuation {
+            line.trim_end_matches('\\').trim_end()
+        } else {
+            line
+        };
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(fragment);
+        if !continuation {
+            commands.push(std::mem::take(&mut current));
+        }
+    }
+
+    if !current.is_empty() {
+        commands.push(current);
+    }
+    commands
+}
+
 fn invocation_covers_pair(text: &str, typespec: &str, schema: &str) -> bool {
     let normalized = executable_text(text).replace('\\', "/");
     let lower = normalized.to_ascii_lowercase();
@@ -457,11 +584,18 @@ mod tests {
         )
     }
 
-    fn has_stitching_error(report: &CommandReport) -> bool {
+    fn has_step_stitching_error(report: &CommandReport) -> bool {
         report
             .findings
             .iter()
             .any(|finding| finding.code == "tjsv-full-check-cross-step-stitching")
+    }
+
+    fn has_command_stitching_error(report: &CommandReport) -> bool {
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.code == "tjsv-full-check-cross-command-stitching")
     }
 
     #[test]
@@ -479,7 +613,8 @@ mod tests {
             --output-dir=artifacts/generated
 "#,
         );
-        assert!(!has_stitching_error(&report), "{:#?}", report.findings);
+        assert!(!has_step_stitching_error(&report), "{:#?}", report.findings);
+        assert!(!has_command_stitching_error(&report), "{:#?}", report.findings);
     }
 
     #[test]
@@ -497,7 +632,8 @@ mod tests {
           output_dir: artifacts/generated
 "#,
         );
-        assert!(!has_stitching_error(&report), "{:#?}", report.findings);
+        assert!(!has_step_stitching_error(&report), "{:#?}", report.findings);
+        assert!(!has_command_stitching_error(&report), "{:#?}", report.findings);
     }
 
     #[test]
@@ -512,7 +648,7 @@ mod tests {
         run: echo contracts/example/main.tsp contracts/example/authored.schema.json --report=artifacts/parity.json --output-dir=artifacts/generated
 "#,
         );
-        assert!(has_stitching_error(&report), "{:#?}", report.findings);
+        assert!(has_step_stitching_error(&report), "{:#?}", report.findings);
     }
 
     #[test]
@@ -527,7 +663,78 @@ mod tests {
         run: echo contracts/example/main.tsp contracts/example/authored.schema.json --report=artifacts/parity.json --output-dir=artifacts/generated
 "#,
         );
-        assert!(has_stitching_error(&report), "{:#?}", report.findings);
+        assert!(has_step_stitching_error(&report), "{:#?}", report.findings);
+    }
+
+    #[test]
+    fn rejects_tokens_stitched_across_shell_commands_in_one_step() {
+        let report = run(
+            r#"jobs:
+  parity:
+    steps:
+      - name: stitched within one run block
+        run: |
+          npx tjsv check
+          echo contracts/example/main.tsp contracts/example/authored.schema.json --report=artifacts/parity.json --output-dir=artifacts/generated
+"#,
+        );
+        assert!(!has_step_stitching_error(&report), "{:#?}", report.findings);
+        assert!(has_command_stitching_error(&report), "{:#?}", report.findings);
+    }
+
+    #[test]
+    fn accepts_complete_command_after_unrelated_shell_setup() {
+        let report = run(
+            r#"jobs:
+  parity:
+    steps:
+      - name: full check after setup
+        run: |
+          set -euo pipefail
+          echo preparing
+          npx tjsv check \
+            --typespec=contracts/example/main.tsp \
+            --schema=contracts/example/authored.schema.json \
+            --report=artifacts/parity.json \
+            --output-dir=artifacts/generated
+          echo complete
+"#,
+        );
+        assert!(!has_step_stitching_error(&report), "{:#?}", report.findings);
+        assert!(!has_command_stitching_error(&report), "{:#?}", report.findings);
+    }
+
+    #[test]
+    fn accepts_folded_run_scalar_as_one_shell_command() {
+        let report = run(
+            r#"jobs:
+  parity:
+    steps:
+      - name: folded check
+        run: >-
+          npx tjsv check
+          --typespec=contracts/example/main.tsp
+          --schema=contracts/example/authored.schema.json
+          --report=artifacts/parity.json
+          --output-dir=artifacts/generated
+"#,
+        );
+        assert!(!has_command_stitching_error(&report), "{:#?}", report.findings);
+    }
+
+    #[test]
+    fn a_real_atomic_command_prevents_a_decoy_from_creating_a_false_error() {
+        let report = run(
+            r#"jobs:
+  parity:
+    steps:
+      - name: decoy and real command
+        run: |
+          npx tjsv check
+          npx tjsv check --typespec=contracts/example/main.tsp --schema=contracts/example/authored.schema.json --report=artifacts/parity.json --output-dir=artifacts/generated
+"#,
+        );
+        assert!(!has_command_stitching_error(&report), "{:#?}", report.findings);
     }
 
     #[test]
@@ -542,7 +749,8 @@ mod tests {
         run: npx tjsv check --typespec=contracts/example/main.tsp --schema=contracts/example/authored.schema.json --report=artifacts/parity.json --output-dir=artifacts/generated
 "#,
         );
-        assert!(!has_stitching_error(&report), "{:#?}", report.findings);
+        assert!(!has_step_stitching_error(&report), "{:#?}", report.findings);
+        assert!(!has_command_stitching_error(&report), "{:#?}", report.findings);
     }
 
     #[test]
@@ -556,6 +764,7 @@ mod tests {
       # contracts/example/main.tsp contracts/example/authored.schema.json --report=x --output-dir=y
 "#,
         );
-        assert!(!has_stitching_error(&report), "{:#?}", report.findings);
+        assert!(!has_step_stitching_error(&report), "{:#?}", report.findings);
+        assert!(!has_command_stitching_error(&report), "{:#?}", report.findings);
     }
 }
