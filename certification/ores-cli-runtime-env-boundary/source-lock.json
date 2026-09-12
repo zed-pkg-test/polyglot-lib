@@ -1,0 +1,24 @@
+{
+  "schema": "ores.test.source-lock/v1",
+  "repository": "ORESoftware/ores-cli",
+  "pullRequest": 227,
+  "commit": "93827083f89d90e2bd2c676e11a1b0904c01aef9",
+  "files": {
+    "src/audit/runtime_toml_env_boundary.rs": "c9a92566914447c3dd58b62c5543440ae2d75485",
+    "src/audit/mod.rs": "3cb95e64a0c991f40981db98cc72342a464cbf3d"
+  },
+  "authorityModel": {
+    "typespec": "independently-authored-first-class",
+    "jsonSchema": "independently-authored-first-class",
+    "typespecProjection": "generated-json-schema-b",
+    "generatedJsonSchema": "comparison-evidence-only",
+    "comparison": "generated-b-vs-authored-a",
+    "precedence": "none"
+  },
+  "composition": {
+    "runtimeEnvBoundaryWired": true,
+    "flags2envPreserved": true,
+    "tjsvPeerAuthorityPreserved": true,
+    "secretArgvCollisionsRejected": true
+  }
+}
