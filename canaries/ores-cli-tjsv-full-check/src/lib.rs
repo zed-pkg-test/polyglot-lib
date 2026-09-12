@@ -83,7 +83,9 @@ pub mod model {
 }
 
 pub mod audit {
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
+
+    use crate::model::CommandReport;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct RepositoryAuditOptions {
@@ -93,4 +95,35 @@ pub mod audit {
     }
 
     mod tjsv_full_check;
+
+    /// Exercise the exact production augmentation through the same module
+    /// boundary that owns it in ores-cli. This keeps the public canary honest:
+    /// strict Clippy sees the production path as reachable instead of treating
+    /// the snapshot as test-only/dead code.
+    #[must_use]
+    pub fn exercise_tjsv_full_check(root: &Path) -> CommandReport {
+        let options = RepositoryAuditOptions {
+            path: root.to_path_buf(),
+            profile: "standards".to_owned(),
+            additional_required_paths: Vec::new(),
+        };
+        tjsv_full_check::augment_tjsv_full_check_audit(
+            &options,
+            CommandReport::new("canary tjsv full check"),
+        )
+    }
+}
+
+#[cfg(test)]
+mod canary_tests {
+    use tempfile::tempdir;
+
+    use crate::audit::exercise_tjsv_full_check;
+
+    #[test]
+    fn production_augmentation_is_reachable_from_the_canary_boundary() {
+        let root = tempdir().expect("temporary repository root");
+        let report = exercise_tjsv_full_check(root.path());
+        assert_eq!(report.command, "canary tjsv full check");
+    }
 }
