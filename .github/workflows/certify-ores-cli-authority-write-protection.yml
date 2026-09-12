@@ -1,0 +1,82 @@
+name: certify ores-cli authored-authority write protection
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/certify-ores-cli-authority-write-protection.yml'
+      - 'evidence/ores-cli-authority-write-protection.json'
+      - 'certification/ores-cli-authority-write-protection/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact test head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact product source binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=certification/ores-cli-authority-write-protection
+          test "$(git hash-object "$root/src/audit/authority_write_protection.rs")" = 'ff68af00ebf17a86d30b27a61dfd6ba26f5824fb'
+          jq -e '
+            .productHead == "542fc4952fe111b306a026f7997f85c155fcc04b"
+            and .sourceBlob == "ff68af00ebf17a86d30b27a61dfd6ba26f5824fb"
+            and .dispatcherBlob == "04c11a5b29cc80a176598f07af81bd89ccd3584a"
+            and .authority.typespec == "independent-first-class"
+            and .authority.jsonSchema == "independent-draft-2020-12-first-class"
+            and .authority.generatedSchemaB == "comparison-evidence-only"
+            and .authority.precedence == "none"
+          ' evidence/ores-cli-authority-write-protection.json >/dev/null
+
+      - name: Install Rust 1.95
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.95.0
+          components: rustfmt, clippy
+
+      - name: Run exact vendored product gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=certification/ores-cli-authority-write-protection/Cargo.toml
+          cargo fmt --manifest-path "$manifest" --all -- --check
+          cargo clippy --manifest-path "$manifest" --all-targets -- -D warnings
+          cargo test --manifest-path "$manifest" --all-targets
+          cargo test --release --manifest-path "$manifest" --all-targets
+
+      - name: Require focused regression inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=certification/ores-cli-authority-write-protection/Cargo.toml
+          tests="$(cargo test --manifest-path "$manifest" --all-targets -- --list)"
+          for name in \
+            rejects_shell_overwrite_of_authored_json_schema \
+            rejects_shell_overwrite_of_authored_typespec \
+            rejects_programmatic_write_to_authored_peer \
+            allows_tjsv_reads_and_generated_json_output \
+            allows_hash_and_compare_of_both_authored_peers \
+            ignores_commented_write_examples
+          do
+            grep -Fq "$name" <<<"$tests"
+          done
+
+      - name: Preserve exact certification source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- \
+            .github/workflows/certify-ores-cli-authority-write-protection.yml \
+            evidence/ores-cli-authority-write-protection.json \
+            certification/ores-cli-authority-write-protection
