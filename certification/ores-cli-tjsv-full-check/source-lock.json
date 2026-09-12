@@ -1,0 +1,22 @@
+{
+  "schema": "zed-pkg-test.ores-cli-tjsv-full-check/v1",
+  "upstream": {
+    "repository": "ORESoftware/ores-cli",
+    "pullRequest": 177,
+    "head": "6e29a4e0650ef2fd84432b835caf16810710b6bf",
+    "path": "src/audit/tjsv_full_check.rs",
+    "blob": "60e851132201be94fdd14d92939e88600c74adc7"
+  },
+  "mirror": {
+    "path": "src/tjsv_full_check.rs",
+    "blob": "a99fb6989e78ac043c485cc62b5ea46a7919639e",
+    "scope": "executable-production-prefix-before-cfg-test-module",
+    "purpose": "compile the production scanner against an independent model/report harness and add adversarial acceptance cases"
+  },
+  "contract": {
+    "typespecAuthority": "independently-authored",
+    "jsonSchemaAuthority": "independently-authored",
+    "generatedJsonSchemaRole": "comparison-evidence-only",
+    "authorityPrecedence": "none"
+  }
+}
