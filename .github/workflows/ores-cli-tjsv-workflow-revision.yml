@@ -1,0 +1,101 @@
+name: ores-cli TJSV workflow revision canary
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ores-cli-tjsv-workflow-revision.yml'
+      - 'certification/ores-cli-tjsv-workflow-revision/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-tjsv-workflow-revision-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORES_CLI_CANDIDATE: d9473c3c8fe0e7b105ac54676bcb4b5984ec84fa
+  ORES_CLI_REVISION_MODULE_BLOB: 8f3fadfad66824e84e03b9f342a96efbf673102b
+  ORES_CLI_AUDIT_MOD_BLOB: 4f30acb27f8d83cf4948529fce56b9cab315553a
+  CERT_ROOT: certification/ores-cli-tjsv-workflow-revision
+
+jobs:
+  certify-exact-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact canary head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate canary workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/ores-cli-tjsv-workflow-revision.yml
+
+      - name: Prove exact mirrored product identities and current-main dispatcher wiring
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          module="$CERT_ROOT/src/tjsv_workflow_revision.rs"
+          dispatcher="$CERT_ROOT/product-audit-mod.rs"
+          lock="$CERT_ROOT/source-lock.json"
+          test "$(git hash-object "$module")" = "$ORES_CLI_REVISION_MODULE_BLOB"
+          test "$(git hash-object "$dispatcher")" = "$ORES_CLI_AUDIT_MOD_BLOB"
+          jq -e --arg commit "$ORES_CLI_CANDIDATE" \
+            --arg module "$ORES_CLI_REVISION_MODULE_BLOB" \
+            --arg dispatcher "$ORES_CLI_AUDIT_MOD_BLOB" '
+              .repository == "ORESoftware/ores-cli" and
+              .pullRequest == 222 and
+              .commit == $commit and
+              .files["src/audit/tjsv_workflow_revision.rs"] == $module and
+              .files["src/audit/mod.rs"] == $dispatcher and
+              .authorityModel.typespec == "independently-authored-first-class" and
+              .authorityModel.jsonSchema == "independently-authored-first-class" and
+              .authorityModel.generatedJsonSchema == "comparison-evidence-only" and
+              .authorityModel.precedence == "none"
+            ' "$lock"
+          grep -Fqx 'mod tjsv_bidirectional_drift;' "$dispatcher"
+          grep -Fqx 'mod tjsv_workflow_revision;' "$dispatcher"
+          grep -Fq 'tjsv_bidirectional_drift::augment_tjsv_bidirectional_drift_audit(options, report)' "$dispatcher"
+          grep -Fq 'tjsv_workflow_revision::augment_tjsv_workflow_revision_audit(options, report)' "$dispatcher"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.90.0'
+          components: rustfmt, clippy
+
+      - name: Require formatting
+        run: cargo +1.90.0 fmt --manifest-path "$CERT_ROOT/Cargo.toml" --all -- --check
+
+      - name: Compile exact product module in the certificate shell
+        run: cargo +1.90.0 check --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
+
+      - name: Run exact embedded product regressions
+        run: cargo +1.90.0 test --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- --nocapture
+
+      - name: Deny warnings under Clippy
+        run: cargo +1.90.0 clippy --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- -D warnings
+
+      - name: Repeat exact regressions optimized
+        run: cargo +1.90.0 test --release --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
+
+      - name: Prove first-class peer-authority semantics remain in exact source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          module="$CERT_ROOT/src/tjsv_workflow_revision.rs"
+          grep -Fq 'TypeSpec and independently authored Draft 2020-12 JSON Schema remain equal' "$module"
+          grep -Fq 'generated JSON' "$module"
+          grep -Fq 'comparison-only evidence' "$module"
+          grep -Fq 'COMMIT_HEX_LENGTH: usize = 40' "$module"
+          test "$(git hash-object "$module")" = "$ORES_CLI_REVISION_MODULE_BLOB"
+          test "$(git hash-object "$CERT_ROOT/product-audit-mod.rs")" = "$ORES_CLI_AUDIT_MOD_BLOB"
+
+      - name: Prove tracked certificate sources remained immutable
+        run: git diff --exit-code -- "$CERT_ROOT" .github/workflows/ores-cli-tjsv-workflow-revision.yml
