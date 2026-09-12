@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ORES_CLI_CANDIDATE: 20cccd57c1ef7381cf71911de5ef64c1c684ea21
+  ORES_CLI_CANDIDATE: f20d3a8f75e72025e2d735a9668822c313e18468
   ORES_CLI_SCOPE_MODULE_BLOB: 9978ef43ff4878529940aebec992be546b2566b8
-  ORES_CLI_AUDIT_MOD_BLOB: 1557ab1ef6021a8e41f20525ffbaf73bd3cc03d7
+  ORES_CLI_AUDIT_MOD_BLOB: b9b2c98fe9ef84fcad7bbae21e51e0f7952fafb6
   CERT_ROOT: certification/ores-cli-tjsv-command-scope
 
 jobs:
@@ -37,7 +37,7 @@ jobs:
         with:
           args: .github/workflows/ores-cli-tjsv-command-scope.yml
 
-      - name: Prove exact source lock and current-main composition
+      - name: Prove exact source lock and merged-main composition
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -53,6 +53,7 @@ jobs:
               .repository == "ORESoftware/ores-cli" and
               .pullRequest == 255 and
               .commit == $commit and
+              .revisionRole == "merged-product-commit" and
               .files["src/audit/tjsv_invocation_scope.rs"] == $module and
               .files["src/audit/mod.rs"] == $dispatcher and
               .certificate.mode == "byte-identical-product-mirror" and
@@ -68,6 +69,8 @@ jobs:
               .composition.oauthProviderLintPreserved == true and
               .composition.generatedSchemaProvenancePreserved == true and
               .composition.fullCheckPreserved == true and
+              .composition.currentInputBindingsPreserved == true and
+              .composition.currentInputVerifierPreserved == true and
               .composition.revisionConsistencyPreserved == true and
               .composition.runtimeEnvBoundaryPreserved == true and
               .composition.crossStepStitchingRejected == true and
@@ -80,12 +83,16 @@ jobs:
           grep -Fqx 'mod tjsv_generated_schema_provenance;' "$dispatcher"
           grep -Fqx 'mod tjsv_full_check;' "$dispatcher"
           grep -Fqx 'mod tjsv_invocation_scope;' "$dispatcher"
+          grep -Fqx 'mod workflow_tjsv_inputs;' "$dispatcher"
+          grep -Fqx 'mod workflow_tjsv_step_pairing;' "$dispatcher"
           grep -Fqx 'mod tjsv_workflow_revision;' "$dispatcher"
           grep -Fq 'peer_authority_identity::augment_peer_authority_identity_audit(options, report)' "$dispatcher"
           grep -Fq 'oauth_provider_contract::augment_oauth_provider_contract_audit(options, report)' "$dispatcher"
           grep -Fq 'tjsv_generated_schema_provenance::augment_tjsv_generated_schema_provenance_audit' "$dispatcher"
           grep -Fq 'tjsv_full_check::augment_tjsv_full_check_audit(options, report)' "$dispatcher"
           grep -Fq 'tjsv_invocation_scope::augment_tjsv_invocation_scope_audit(options, report)' "$dispatcher"
+          grep -Fq 'workflow_tjsv_inputs::augment_workflow_tjsv_input_audit(options, report)' "$dispatcher"
+          grep -Fq 'workflow_tjsv_step_pairing::augment_workflow_tjsv_step_pairing_audit(options, report)' "$dispatcher"
           grep -Fq 'tjsv_workflow_revision::augment_tjsv_workflow_revision_audit(options, report)' "$dispatcher"
           grep -Fq 'runtime_toml_env_boundary::augment_runtime_toml_env_boundary_audit(options, report)' "$dispatcher"
 
