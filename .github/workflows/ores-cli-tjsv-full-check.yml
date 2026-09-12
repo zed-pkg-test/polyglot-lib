@@ -14,6 +14,11 @@ concurrency:
   group: ores-cli-tjsv-full-check-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  ORES_CLI_CANDIDATE: 0611b1853b7225e1cba8adca079e989d6816e051
+  ORES_CLI_TJSV_FULL_CHECK_BLOB: 60e851132201be94fdd14d92939e88600c74adc7
+  ORES_CLI_AUDIT_MOD_BLOB: 6174f65a07145bd0f2b0624a94a5f578a45a3de1
+
 jobs:
   certify-exact-product-slice:
     runs-on: ubuntu-24.04
@@ -30,15 +35,29 @@ jobs:
         with:
           args: .github/workflows/ores-cli-tjsv-full-check.yml
 
-      - name: Prove exact ores-cli candidate blobs and dispatcher wiring
+      - name: Check out exact current ores-cli candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ORESoftware/ores-cli
+          ref: ${{ env.ORES_CLI_CANDIDATE }}
+          path: product
+          persist-credentials: false
+          show-progress: false
+          fetch-depth: 1
+
+      - name: Prove and stage exact current product sources
         shell: bash
         run: |
           set -Eeuo pipefail
-          root='canaries/ores-cli-tjsv-full-check'
-          test "$(git hash-object "$root/src/audit/tjsv_full_check.rs")" = '83c392bd327d9d7df1fefcef98d5f2f49e7ab8c0'
-          test "$(git hash-object "$root/product-audit-mod.rs")" = '6174f65a07145bd0f2b0624a94a5f578a45a3de1'
-          grep -Fqx 'mod tjsv_full_check;' "$root/product-audit-mod.rs"
-          grep -Fq 'tjsv_full_check::augment_tjsv_full_check_audit(options, report)' "$root/product-audit-mod.rs"
+          test "$(git -C product rev-parse HEAD)" = "$ORES_CLI_CANDIDATE"
+          test "$(git -C product hash-object src/audit/tjsv_full_check.rs)" = "$ORES_CLI_TJSV_FULL_CHECK_BLOB"
+          test "$(git -C product hash-object src/audit/mod.rs)" = "$ORES_CLI_AUDIT_MOD_BLOB"
+          grep -Fqx 'mod tjsv_full_check;' product/src/audit/mod.rs
+          grep -Fq 'tjsv_full_check::augment_tjsv_full_check_audit(options, report)' product/src/audit/mod.rs
+          cp product/src/audit/tjsv_full_check.rs canaries/ores-cli-tjsv-full-check/src/audit/tjsv_full_check.rs
+          cp product/src/audit/mod.rs canaries/ores-cli-tjsv-full-check/product-audit-mod.rs
+          test "$(git hash-object canaries/ores-cli-tjsv-full-check/src/audit/tjsv_full_check.rs)" = "$ORES_CLI_TJSV_FULL_CHECK_BLOB"
+          test "$(git hash-object canaries/ores-cli-tjsv-full-check/product-audit-mod.rs)" = "$ORES_CLI_AUDIT_MOD_BLOB"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
@@ -46,10 +65,10 @@ jobs:
           toolchain: '1.90.0'
           components: rustfmt, clippy
 
-      - name: Format exact module and canary harness
+      - name: Format exact current module and canary harness
         run: cargo +1.90.0 fmt --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all -- --check
 
-      - name: Compile canary harness
+      - name: Compile exact current product slice
         run: cargo +1.90.0 check --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
 
       - name: Run exact embedded product regressions
@@ -60,3 +79,6 @@ jobs:
 
       - name: Repeat regressions optimized
         run: cargo +1.90.0 test --release --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
+
+      - name: Prove product checkout remained immutable
+        run: git -C product diff --exit-code -- .
