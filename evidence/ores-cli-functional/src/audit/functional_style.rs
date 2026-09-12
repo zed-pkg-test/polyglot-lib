@@ -115,12 +115,7 @@ pub(super) fn audit_functional_style(root: &Path, report: &mut CommandReport) {
     }
 }
 
-fn audit_rust(
-    root: &Path,
-    path: &Path,
-    text: &str,
-    report: &mut CommandReport,
-) -> (usize, usize) {
+fn audit_rust(root: &Path, path: &Path, text: &str, report: &mut CommandReport) -> (usize, usize) {
     let lines = text.lines().collect::<Vec<_>>();
     let mut index = 0usize;
     let mut candidates = 0usize;
@@ -171,12 +166,7 @@ fn audit_rust(
     (candidates, exemptions)
 }
 
-fn audit_go(
-    root: &Path,
-    path: &Path,
-    text: &str,
-    report: &mut CommandReport,
-) -> (usize, usize) {
+fn audit_go(root: &Path, path: &Path, text: &str, report: &mut CommandReport) -> (usize, usize) {
     let lines = text.lines().collect::<Vec<_>>();
     let mut candidates = 0usize;
     let mut exemptions = 0usize;
@@ -185,7 +175,9 @@ fn audit_go(
         if !trimmed.starts_with("func ") || trimmed.starts_with("func (") {
             continue;
         }
-        let Some(open) = trimmed.find('(') else { continue };
+        let Some(open) = trimmed.find('(') else {
+            continue;
+        };
         let Some(close_offset) = trimmed[open + 1..].find(')') else {
             continue;
         };
@@ -196,11 +188,7 @@ fn audit_go(
             if !segment.contains('*') {
                 continue;
             }
-            let name = segment
-                .split_whitespace()
-                .next()
-                .unwrap_or_default()
-                .trim();
+            let name = segment.split_whitespace().next().unwrap_or_default().trim();
             if !identifier(name) || !body_mutates(&lines, index + 1, name, "go") {
                 continue;
             }
@@ -429,9 +417,11 @@ fn body_mutates(lines: &[&str], start: usize, name: &str, extension: &str) -> bo
 }
 
 fn assignment_operator(text: &str) -> bool {
-    [" = ", " += ", " -= ", " *= ", " /= ", " ??= ", " ||= ", " &&= "]
-        .iter()
-        .any(|operator| text.contains(operator))
+    [
+        " = ", " += ", " -= ", " *= ", " /= ", " ??= ", " ||= ", " &&= ",
+    ]
+    .iter()
+    .any(|operator| text.contains(operator))
         || (text.contains(" =") && !text.contains(" =="))
 }
 
@@ -492,7 +482,10 @@ mod tests {
 
     #[test]
     fn rust_factory_is_not_flagged() {
-        let report = audit("src/lib.rs", "fn create_foo() -> Foo { Foo { value: 1 } }\n");
+        let report = audit(
+            "src/lib.rs",
+            "fn create_foo() -> Foo { Foo { value: 1 } }\n",
+        );
         assert!(!has(&report, "functional-style-mutable-parameter"));
     }
 
@@ -512,10 +505,12 @@ mod tests {
             "// ores-functional: hot-path reason=reuses a preallocated packet buffer\nfn fill_packet(value: &mut Vec<u8>) { value.push(1); }\n",
         );
         assert!(has(&report, "functional-style-hot-path-exemption"));
-        assert!(!report
-            .findings
-            .iter()
-            .any(|finding| finding.severity != Severity::Info));
+        assert!(
+            !report
+                .findings
+                .iter()
+                .any(|finding| finding.severity != Severity::Info)
+        );
     }
 
     #[test]
@@ -524,18 +519,12 @@ mod tests {
             "src/lib.rs",
             "// ores-functional: hot-path reason=fast\nfn fill_packet(value: &mut Vec<u8>) { value.push(1); }\n",
         );
-        assert!(has(
-            &report,
-            "functional-style-hot-path-missing-rationale"
-        ));
+        assert!(has(&report, "functional-style-hot-path-missing-rationale"));
     }
 
     #[test]
     fn go_pointer_output_mutation_is_flagged() {
-        let report = audit(
-            "worker.go",
-            "func Mutate(foo *Foo) {\n  foo.Count = 2\n}\n",
-        );
+        let report = audit("worker.go", "func Mutate(foo *Foo) {\n  foo.Count = 2\n}\n");
         assert!(has(&report, "functional-style-go-pointer-mutation"));
     }
 
