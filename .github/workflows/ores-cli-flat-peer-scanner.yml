@@ -12,8 +12,8 @@ permissions:
 
 env:
   CERT_ROOT: certification/ores-cli-flat-peer-scanner
-  PRODUCT_HEAD: 9e5805fc96df998e2b0e6e7aea64b620e50f80a8
-  PRODUCT_BLOB: 461f582984077390f4d272ab66e3d0b56838924e
+  PRODUCT_HEAD: 0080d10f9e35391948a147ce6576b570503cb1db
+  PRODUCT_BLOB: 70f415ca1ec2060f6f06533a9d89df8b188f38ed
 
 jobs:
   certify-exact-source:
@@ -41,7 +41,7 @@ jobs:
           test "$(git hash-object "$module")" = "$PRODUCT_BLOB"
           jq -e --arg head "$PRODUCT_HEAD" --arg blob "$PRODUCT_BLOB" '
             .repository == "ORESoftware/ores-cli" and
-            .pullRequest == 254 and
+            .pullRequest == 260 and
             .productHead == $head and
             .files["src/audit/split_peer_contracts.rs"] == $blob and
             .authorityModel.typespec == "independently-authored-first-class" and
