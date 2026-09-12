@@ -16,6 +16,7 @@ const MAX_CONTRACT_DIRECTORIES: usize = 256;
 const MAX_EXECUTION_FILES: usize = 256;
 const MAX_EXECUTION_FILE_BYTES: u64 = 1024 * 1024;
 const MAX_WALK_DEPTH: usize = 16;
+const TJSV_ACTION_PREFIX: &str = "oresoftware/typespec-json-schema-validator@";
 
 #[derive(Debug, Default)]
 struct PairCandidate {
@@ -68,7 +69,7 @@ pub(super) fn augment_tjsv_full_check_audit(
                 Finding::error(
                     "tjsv-full-check-missing",
                     format!(
-                        "peer authorities {typespec} and {schema} require a fail-closed full `tjsv check` invocation that names both authored inputs"
+                        "peer authorities {typespec} and {schema} require a fail-closed full `tjsv check` invocation that names both authored inputs, declares parity-report and generated-Schema-B destinations, keeps differential probes enabled, and pins the canonical action when action syntax is used"
                     ),
                 )
                 .with_target(directory),
@@ -174,7 +175,13 @@ fn discover_execution_files(root: &Path, report: &mut CommandReport) -> Vec<Exec
             }
         }
     }
-    for relative in ["Makefile", "justfile", "Taskfile.yml", "Taskfile.yaml", "package.json"] {
+    for relative in [
+        "Makefile",
+        "justfile",
+        "Taskfile.yml",
+        "Taskfile.yaml",
+        "package.json",
+    ] {
         let path = root.join(relative);
         if fs::symlink_metadata(&path)
             .is_ok_and(|metadata| metadata.is_file() && !metadata.file_type().is_symlink())
@@ -234,26 +241,101 @@ fn discover_execution_files(root: &Path, report: &mut CommandReport) -> Vec<Exec
 }
 
 fn invocation_covers_pair(text: &str, typespec: &str, schema: &str) -> bool {
-    let normalized = text.replace('\\', "/");
+    let normalized = executable_text(text).replace('\\', "/");
     let lower = normalized.to_ascii_lowercase();
-    let action = lower.contains("uses: oresoftware/typespec-json-schema-validator@");
-    let command = lower.contains("tjsv check")
-        || lower.contains("typespec-json-schema-validator check")
-        || lower.contains("tsjsv check");
+    let action = contains_immutably_pinned_tjsv_action(&lower);
+    let command = contains_full_check_command(&lower);
     if !action && !command {
         return false;
     }
 
-    path_variants(typespec)
+    let names_both_authorities = path_variants(typespec)
         .iter()
         .any(|path| normalized.contains(path.as_str()))
         && path_variants(schema)
             .iter()
-            .any(|path| normalized.contains(path.as_str()))
+            .any(|path| normalized.contains(path.as_str()));
+    let declares_report = contains_cli_option(&lower, "report")
+        || contains_yaml_input(&lower, "report")
+        || contains_yaml_input(&lower, "parity_report");
+    let declares_generated_schema = contains_cli_option(&lower, "output-dir")
+        || contains_yaml_input(&lower, "output_dir")
+        || contains_yaml_input(&lower, "output-dir");
+    let differential_disabled = [
+        "--probes=false",
+        "--probes=0",
+        "--max-probes=0",
+        "probes: false",
+        "probes: \"false\"",
+        "probes: 'false'",
+        "max_probes: 0",
+        "max-probes: 0",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+
+    names_both_authorities
+        && declares_report
+        && declares_generated_schema
+        && !differential_disabled
+}
+
+fn executable_text(text: &str) -> String {
+    text.lines()
+        .filter(|line| {
+            let trimmed = line.trim_start();
+            !trimmed.starts_with('#') && !trimmed.starts_with("//")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn contains_immutably_pinned_tjsv_action(lower: &str) -> bool {
+    lower.lines().any(|line| {
+        let trimmed = line.trim_start().trim_start_matches('-').trim_start();
+        let Some(value) = trimmed.strip_prefix("uses:") else {
+            return false;
+        };
+        let value = value
+            .trim()
+            .trim_matches(|character| character == '\'' || character == '"');
+        let Some(revision) = value.strip_prefix(TJSV_ACTION_PREFIX) else {
+            return false;
+        };
+        revision.len() == 40 && revision.bytes().all(|byte| byte.is_ascii_hexdigit())
+    })
+}
+
+fn contains_full_check_command(lower: &str) -> bool {
+    [
+        "tjsv check",
+        "tsjsv check",
+        "typespec-json-schema-validator check",
+        "typespec-json-schema-validator.mjs check",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+fn contains_cli_option(lower: &str, option: &str) -> bool {
+    lower.contains(&format!("--{option}="))
+        || lower.contains(&format!("--{option} "))
+        || lower.contains(&format!("--{option}\n"))
+}
+
+fn contains_yaml_input(lower: &str, input: &str) -> bool {
+    lower
+        .lines()
+        .map(str::trim_start)
+        .any(|line| line.starts_with(&format!("{input}:")))
 }
 
 fn path_variants(path: &str) -> [String; 3] {
-    [path.to_owned(), format!("./{path}"), format!("$GITHUB_WORKSPACE/{path}")]
+    [
+        path.to_owned(),
+        format!("./{path}"),
+        format!("$GITHUB_WORKSPACE/{path}"),
+    ]
 }
 
 fn should_descend(entry: &DirEntry) -> bool {
