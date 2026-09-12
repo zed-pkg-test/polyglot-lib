@@ -174,7 +174,13 @@ fn discover_execution_files(root: &Path, report: &mut CommandReport) -> Vec<Exec
             }
         }
     }
-    for relative in ["Makefile", "justfile", "Taskfile.yml", "Taskfile.yaml", "package.json"] {
+    for relative in [
+        "Makefile",
+        "justfile",
+        "Taskfile.yml",
+        "Taskfile.yaml",
+        "package.json",
+    ] {
         let path = root.join(relative);
         if fs::symlink_metadata(&path)
             .is_ok_and(|metadata| metadata.is_file() && !metadata.file_type().is_symlink())
@@ -253,7 +259,11 @@ fn invocation_covers_pair(text: &str, typespec: &str, schema: &str) -> bool {
 }
 
 fn path_variants(path: &str) -> [String; 3] {
-    [path.to_owned(), format!("./{path}"), format!("$GITHUB_WORKSPACE/{path}")]
+    [
+        path.to_owned(),
+        format!("./{path}"),
+        format!("$GITHUB_WORKSPACE/{path}"),
+    ]
 }
 
 fn should_descend(entry: &DirEntry) -> bool {

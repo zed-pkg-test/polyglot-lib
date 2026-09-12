@@ -35,7 +35,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           root='canaries/ores-cli-tjsv-full-check'
-          test "$(git hash-object "$root/src/audit/tjsv_full_check.rs")" = '41b5fc7ace31717fbb4980e728225d7b656ad979'
+          test "$(git hash-object "$root/src/audit/tjsv_full_check.rs")" = '83c392bd327d9d7df1fefcef98d5f2f49e7ab8c0'
           test "$(git hash-object "$root/product-audit-mod.rs")" = '6174f65a07145bd0f2b0624a94a5f578a45a3de1'
           grep -Fqx 'mod tjsv_full_check;' "$root/product-audit-mod.rs"
           grep -Fq 'tjsv_full_check::augment_tjsv_full_check_audit(options, report)' "$root/product-audit-mod.rs"
