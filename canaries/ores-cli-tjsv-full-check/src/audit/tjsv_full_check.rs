@@ -16,6 +16,7 @@ const MAX_CONTRACT_DIRECTORIES: usize = 256;
 const MAX_EXECUTION_FILES: usize = 256;
 const MAX_EXECUTION_FILE_BYTES: u64 = 1024 * 1024;
 const MAX_WALK_DEPTH: usize = 16;
+const TJSV_ACTION_PREFIX: &str = "oresoftware/typespec-json-schema-validator@";
 
 #[derive(Debug, Default)]
 struct PairCandidate {
@@ -68,7 +69,7 @@ pub(super) fn augment_tjsv_full_check_audit(
                 Finding::error(
                     "tjsv-full-check-missing",
                     format!(
-                        "peer authorities {typespec} and {schema} require a fail-closed full `tjsv check` invocation that names both authored inputs"
+                        "peer authorities {typespec} and {schema} require a fail-closed full `tjsv check` invocation that names both authored inputs, declares parity-report and generated-Schema-B destinations, keeps differential probes enabled, and pins the canonical action when action syntax is used"
                     ),
                 )
                 .with_target(directory),
@@ -240,22 +241,93 @@ fn discover_execution_files(root: &Path, report: &mut CommandReport) -> Vec<Exec
 }
 
 fn invocation_covers_pair(text: &str, typespec: &str, schema: &str) -> bool {
-    let normalized = text.replace('\\', "/");
+    let normalized = executable_text(text).replace('\\', "/");
     let lower = normalized.to_ascii_lowercase();
-    let action = lower.contains("uses: oresoftware/typespec-json-schema-validator@");
-    let command = lower.contains("tjsv check")
-        || lower.contains("typespec-json-schema-validator check")
-        || lower.contains("tsjsv check");
+    let action = contains_immutably_pinned_tjsv_action(&lower);
+    let command = contains_full_check_command(&lower);
     if !action && !command {
         return false;
     }
 
-    path_variants(typespec)
+    let names_both_authorities = path_variants(typespec)
         .iter()
         .any(|path| normalized.contains(path.as_str()))
         && path_variants(schema)
             .iter()
-            .any(|path| normalized.contains(path.as_str()))
+            .any(|path| normalized.contains(path.as_str()));
+    let declares_report = contains_cli_option(&lower, "report")
+        || contains_yaml_input(&lower, "report")
+        || contains_yaml_input(&lower, "parity_report");
+    let declares_generated_schema = contains_cli_option(&lower, "output-dir")
+        || contains_yaml_input(&lower, "output_dir")
+        || contains_yaml_input(&lower, "output-dir");
+    let differential_disabled = [
+        "--probes=false",
+        "--probes=0",
+        "--max-probes=0",
+        "probes: false",
+        "probes: \"false\"",
+        "probes: 'false'",
+        "max_probes: 0",
+        "max-probes: 0",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+
+    names_both_authorities
+        && declares_report
+        && declares_generated_schema
+        && !differential_disabled
+}
+
+fn executable_text(text: &str) -> String {
+    text.lines()
+        .filter(|line| {
+            let trimmed = line.trim_start();
+            !trimmed.starts_with('#') && !trimmed.starts_with("//")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn contains_immutably_pinned_tjsv_action(lower: &str) -> bool {
+    lower.lines().any(|line| {
+        let trimmed = line.trim_start().trim_start_matches('-').trim_start();
+        let Some(value) = trimmed.strip_prefix("uses:") else {
+            return false;
+        };
+        let value = value
+            .trim()
+            .trim_matches(|character| character == '\'' || character == '"');
+        let Some(revision) = value.strip_prefix(TJSV_ACTION_PREFIX) else {
+            return false;
+        };
+        revision.len() == 40 && revision.bytes().all(|byte| byte.is_ascii_hexdigit())
+    })
+}
+
+fn contains_full_check_command(lower: &str) -> bool {
+    [
+        "tjsv check",
+        "tsjsv check",
+        "typespec-json-schema-validator check",
+        "typespec-json-schema-validator.mjs check",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+fn contains_cli_option(lower: &str, option: &str) -> bool {
+    lower.contains(&format!("--{option}="))
+        || lower.contains(&format!("--{option} "))
+        || lower.contains(&format!("--{option}\n"))
+}
+
+fn contains_yaml_input(lower: &str, input: &str) -> bool {
+    lower
+        .lines()
+        .map(str::trim_start)
+        .any(|line| line.starts_with(&format!("{input}:")))
 }
 
 fn path_variants(path: &str) -> [String; 3] {
@@ -335,7 +407,7 @@ mod tests {
     #[test]
     fn accepts_full_check_with_both_independent_authorities() {
         let report = run(
-            "run: npx tjsv check --typespec=contracts/example/main.tsp --schema=contracts/example/authored.schema.json --report=artifacts/parity.json\n",
+            "run: npx tjsv check --typespec=contracts/example/main.tsp --schema=contracts/example/authored.schema.json --report=artifacts/parity.json --output-dir=artifacts/generated\n",
         );
         assert_eq!(report.issue_count(), 0, "{:#?}", report.findings);
         assert!(
@@ -347,9 +419,23 @@ mod tests {
     }
 
     #[test]
+    fn accepts_real_compiler_entrypoint() {
+        let report = run(
+            r#"run: |
+  node tmp/tjsv/bin/typespec-json-schema-validator.mjs check \
+    --typespec=contracts/example/main.tsp \
+    --schema=contracts/example/authored.schema.json \
+    --report=artifacts/parity.json \
+    --output-dir=artifacts/generated
+"#,
+        );
+        assert_eq!(report.issue_count(), 0, "{:#?}", report.findings);
+    }
+
+    #[test]
     fn accepts_pinned_action_with_both_independent_authorities() {
         let report = run(
-            "- uses: ORESoftware/typespec-json-schema-validator@0123456789012345678901234567890123456789\n  with:\n    typespec: contracts/example/main.tsp\n    schema: contracts/example/authored.schema.json\n",
+            "- uses: ORESoftware/typespec-json-schema-validator@0123456789012345678901234567890123456789\n  with:\n    typespec: contracts/example/main.tsp\n    schema: contracts/example/authored.schema.json\n    report: artifacts/parity.json\n    output_dir: artifacts/generated\n",
         );
         assert_eq!(report.issue_count(), 0, "{:#?}", report.findings);
         assert!(
@@ -357,6 +443,19 @@ mod tests {
                 .findings
                 .iter()
                 .any(|finding| finding.code == "tjsv-full-check-covered")
+        );
+    }
+
+    #[test]
+    fn rejects_mutable_action_reference() {
+        let report = run(
+            "- uses: ORESoftware/typespec-json-schema-validator@main\n  with:\n    typespec: contracts/example/main.tsp\n    schema: contracts/example/authored.schema.json\n    report: artifacts/parity.json\n    output_dir: artifacts/generated\n",
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == "tjsv-full-check-missing")
         );
     }
 
@@ -374,7 +473,7 @@ mod tests {
     #[test]
     fn rejects_compare_only_evidence() {
         let report = run(
-            "run: npx tjsv compare --typespec=contracts/example/main.tsp --generated-schema=tmp/generated.json --schema=contracts/example/authored.schema.json\n",
+            "run: npx tjsv compare --typespec=contracts/example/main.tsp --generated-schema=tmp/generated.json --schema=contracts/example/authored.schema.json --report=artifacts/parity.json --output-dir=artifacts/generated\n",
         );
         assert!(
             report
@@ -386,7 +485,48 @@ mod tests {
 
     #[test]
     fn rejects_check_that_names_only_one_authority() {
-        let report = run("run: npx tjsv check --typespec=contracts/example/main.tsp\n");
+        let report = run(
+            "run: npx tjsv check --typespec=contracts/example/main.tsp --report=artifacts/parity.json --output-dir=artifacts/generated\n",
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == "tjsv-full-check-missing")
+        );
+    }
+
+    #[test]
+    fn rejects_check_without_report_or_generated_schema_destination() {
+        let report = run(
+            "run: npx tjsv check --typespec=contracts/example/main.tsp --schema=contracts/example/authored.schema.json\n",
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == "tjsv-full-check-missing")
+        );
+    }
+
+    #[test]
+    fn rejects_comment_only_decoy() {
+        let report = run(
+            "# uses: ORESoftware/typespec-json-schema-validator@0123456789012345678901234567890123456789\n# typespec: contracts/example/main.tsp\n# schema: contracts/example/authored.schema.json\n# report: artifacts/parity.json\n# output_dir: artifacts/generated\nrun: echo no-admission\n",
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == "tjsv-full-check-missing")
+        );
+    }
+
+    #[test]
+    fn rejects_explicitly_disabled_differential_probes() {
+        let report = run(
+            "- uses: ORESoftware/typespec-json-schema-validator@0123456789012345678901234567890123456789\n  with:\n    typespec: contracts/example/main.tsp\n    schema: contracts/example/authored.schema.json\n    report: artifacts/parity.json\n    output_dir: artifacts/generated\n    probes: false\n",
+        );
         assert!(
             report
                 .findings
@@ -412,7 +552,7 @@ mod tests {
         fs::create_dir_all(&workflows).expect("workflows");
         fs::write(
             workflows.join("contracts.yml"),
-            "run: npx tjsv check --typespec=contracts/one/main.tsp --schema=contracts/one/authored.schema.json\n",
+            "run: npx tjsv check --typespec=contracts/one/main.tsp --schema=contracts/one/authored.schema.json --report=artifacts/parity.json --output-dir=artifacts/generated\n",
         )
         .expect("workflow");
 
