@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ORES_CLI_CANDIDATE: 878fed163212a748221359e37adb96ae11ee5c2b
+  ORES_CLI_CANDIDATE: 1af7d4a15f50ffdaef7e09b0beeabcb4e3c90dcd
   ORES_CLI_RUNTIME_MODULE_BLOB: 572c2e633b15a37fd04a1a641f3423a1438f91ba
-  ORES_CLI_AUDIT_MOD_BLOB: 3cb95e64a0c991f40981db98cc72342a464cbf3d
+  ORES_CLI_AUDIT_MOD_BLOB: 7e00b188ce5e9bff72619bbb0ea1a007ced583bc
   CERT_ROOT: certification/ores-cli-runtime-env-boundary
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
             --arg dispatcher "$ORES_CLI_AUDIT_MOD_BLOB" '
               .schema == "ores.test.source-lock/v1" and
               .repository == "ORESoftware/ores-cli" and
-              .pullRequest == 227 and
+              .pullRequest == 248 and
               .commit == $commit and
               .files["src/audit/runtime_toml_env_boundary.rs"] == $module and
               .files["src/audit/mod.rs"] == $dispatcher and
