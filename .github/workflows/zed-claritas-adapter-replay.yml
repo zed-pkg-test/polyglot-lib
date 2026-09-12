@@ -1,0 +1,65 @@
+name: Zed Claritas adapter exact-head replay
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/zed-claritas-adapter-replay.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zed-claritas-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact test head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Check out exact public Zed adapter candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zed-pkg/zed-clients
+          ref: 0e70f81575867ea4740df6f5b536f3fa5c909262
+          path: product
+          persist-credentials: false
+
+      - name: Prove exact product head and focused source blobs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git -C product rev-parse HEAD)" = '0e70f81575867ea4740df6f5b536f3fa5c909262'
+          test "$(git -C product hash-object clients/typescript/src/claritas.ts)" = '5afa80caf6fab513b0dfebee45d5dc010c475d5b'
+          test "$(git -C product hash-object clients/typescript/test/claritas.test.mjs)" = 'dedfa4a3374a15680a70643c5cd5cc22b553a190'
+          test "$(git -C product hash-object clients/typescript/test/claritas-admission.test.mjs)" = 'bd9258a4476ad6391820d776e9c78de65144f562'
+
+      - name: Install pinned Node runtime
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.16.0'
+
+      - name: Compile only the authored Claritas adapter
+        working-directory: product/clients/typescript
+        run: npx --yes -p typescript@5.5.4 tsc --strict --target ES2022 --module Node16 --moduleResolution node16 --declaration --outDir dist --rootDir src src/claritas.ts
+
+      - name: Execute focused Zed visualization and admission tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node --test product/clients/typescript/test/claritas.test.mjs
+          node --test product/clients/typescript/test/claritas-admission.test.mjs
+
+      - name: Verify product source stayed immutable
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf product/clients/typescript/dist
+          git -C product diff --exit-code
