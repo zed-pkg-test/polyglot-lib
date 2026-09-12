@@ -31,10 +31,8 @@ mod tests {
     #[test]
     fn rejects_legacy_token_only_body() {
         assert!(
-            serde_json::from_str::<PasswordlessConsumeRequest>(
-                r#"{"token":"sat_magic_example"}"#,
-            )
-            .is_err()
+            serde_json::from_str::<PasswordlessConsumeRequest>(r#"{"token":"sat_magic_example"}"#,)
+                .is_err()
         );
     }
 
