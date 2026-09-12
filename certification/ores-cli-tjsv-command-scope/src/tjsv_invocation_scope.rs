@@ -386,9 +386,11 @@ fn shell_command_blocks(step: &str) -> Vec<String> {
                 .filter(|line| !line.trim_start().starts_with('#'))
                 .collect::<Vec<_>>()
                 .join(" ");
-            return (!folded.trim().is_empty())
-                .then(|| vec![folded])
-                .unwrap_or_default();
+            return if folded.trim().is_empty() {
+                Vec::new()
+            } else {
+                vec![folded]
+            };
         }
 
         return logical_shell_commands(&body.join("\n"));
