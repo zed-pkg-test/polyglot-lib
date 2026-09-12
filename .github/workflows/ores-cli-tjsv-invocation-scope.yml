@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ORES_CLI_CANDIDATE: a4fae32b1233650019139b9090f8553ed16c6fad
-  ORES_CLI_SCOPE_MODULE_BLOB: 9b7163abfa2c1a9208a48cc5af95ce81e22b2441
+  ORES_CLI_CANDIDATE: 3105f76a2d91316128808216aaab7619d214d932
+  ORES_CLI_SCOPE_MODULE_BLOB: bd8054b9484fcc57eb231e401b8bb383ad21e880
   ORES_CLI_AUDIT_MOD_BLOB: 2b62cc898ebff615146661d534b38eb083078ecf
   CERT_ROOT: certification/ores-cli-tjsv-invocation-scope
 
@@ -51,7 +51,7 @@ jobs:
             --arg dispatcher "$ORES_CLI_AUDIT_MOD_BLOB" '
               .schema == "ores.test.source-lock/v1" and
               .repository == "ORESoftware/ores-cli" and
-              .pullRequest == 231 and
+              .pullRequest == 244 and
               .commit == $commit and
               .files["src/audit/tjsv_invocation_scope.rs"] == $module and
               .files["src/audit/mod.rs"] == $dispatcher and
@@ -72,7 +72,7 @@ jobs:
           grep -Fq 'tjsv_invocation_scope::augment_tjsv_invocation_scope_audit(options, report)' "$dispatcher"
           grep -Fq 'tjsv_workflow_revision::augment_tjsv_workflow_revision_audit(options, report)' "$dispatcher"
 
-      - name: Prove first-class TypeSpec and JSON Schema semantics in exact source
+      - name: Prove first-class authority and atomic-command semantics in exact source
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -82,6 +82,8 @@ jobs:
           grep -Fq 'independently authored' "$module"
           grep -Fq 'Schema A' "$module"
           grep -Fq 'tjsv-full-check-cross-step-stitching' "$module"
+          grep -Fq 'tjsv-full-check-cross-command-stitching' "$module"
+          grep -Fq 'one atomic workflow action or shell' "$module"
           test "$(git hash-object "$module")" = "$ORES_CLI_SCOPE_MODULE_BLOB"
           test "$(git hash-object "$CERT_ROOT/product-audit-mod.rs")" = "$ORES_CLI_AUDIT_MOD_BLOB"
 
@@ -97,13 +99,13 @@ jobs:
       - name: Compile exact mirrored product module
         run: cargo +1.95.0 check --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
 
-      - name: Run exact embedded scoped-invocation regressions
+      - name: Run exact embedded step and command scope regressions
         run: cargo +1.95.0 test --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- --nocapture
 
       - name: Deny warnings under Clippy
         run: cargo +1.95.0 clippy --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- -D warnings
 
-      - name: Repeat scoped regressions optimized
+      - name: Repeat step and command scope regressions optimized
         run: cargo +1.95.0 test --release --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
 
       - name: Re-run previously certified full-check product scanner
