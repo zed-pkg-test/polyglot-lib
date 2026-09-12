@@ -37,11 +37,7 @@ pub mod model {
             Self::new(Severity::Info, code, message)
         }
 
-        fn new(
-            severity: Severity,
-            code: impl Into<String>,
-            message: impl Into<String>,
-        ) -> Self {
+        fn new(severity: Severity, code: impl Into<String>, message: impl Into<String>) -> Self {
             Self {
                 code: code.into(),
                 message: message.into(),
