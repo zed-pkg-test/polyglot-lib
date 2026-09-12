@@ -16,7 +16,6 @@ concurrency:
 
 env:
   ORES_CLI_CANDIDATE: 20cccd57c1ef7381cf71911de5ef64c1c684ea21
-  ORES_CLI_SCOPE_BASE_BLOB: bd8054b9484fcc57eb231e401b8bb383ad21e880
   ORES_CLI_SCOPE_MODULE_BLOB: 9978ef43ff4878529940aebec992be546b2566b8
   ORES_CLI_AUDIT_MOD_BLOB: 1557ab1ef6021a8e41f20525ffbaf73bd3cc03d7
   CERT_ROOT: certification/ores-cli-tjsv-command-scope
@@ -38,18 +37,17 @@ jobs:
         with:
           args: .github/workflows/ores-cli-tjsv-command-scope.yml
 
-      - name: Prove source lock, base mirror, and current-main composition
+      - name: Prove exact source lock and current-main composition
         shell: bash
         run: |
           set -Eeuo pipefail
-          base_module="$CERT_ROOT/src/tjsv_invocation_scope.rs"
+          module="$CERT_ROOT/src/tjsv_invocation_scope.rs"
           dispatcher="$CERT_ROOT/product-audit-mod.rs"
           lock="$CERT_ROOT/source-lock.json"
-          test "$(git hash-object "$base_module")" = "$ORES_CLI_SCOPE_BASE_BLOB"
+          test "$(git hash-object "$module")" = "$ORES_CLI_SCOPE_MODULE_BLOB"
           test "$(git hash-object "$dispatcher")" = "$ORES_CLI_AUDIT_MOD_BLOB"
           jq -e --arg commit "$ORES_CLI_CANDIDATE" \
             --arg module "$ORES_CLI_SCOPE_MODULE_BLOB" \
-            --arg base "$ORES_CLI_SCOPE_BASE_BLOB" \
             --arg dispatcher "$ORES_CLI_AUDIT_MOD_BLOB" '
               .schema == "ores.test.source-lock/v1" and
               .repository == "ORESoftware/ores-cli" and
@@ -57,8 +55,8 @@ jobs:
               .commit == $commit and
               .files["src/audit/tjsv_invocation_scope.rs"] == $module and
               .files["src/audit/mod.rs"] == $dispatcher and
-              .certificate.trackedBaseMirrorBlob == $base and
-              .certificate.reconstructedProductBlob == $module and
+              .certificate.mode == "byte-identical-product-mirror" and
+              .certificate.mirrorBlob == $module and
               .authorityModel.typespec == "independently-authored-first-class" and
               .authorityModel.jsonSchema == "independently-authored-first-class" and
               .authorityModel.typespecProjection == "generated-json-schema-b" and
@@ -91,22 +89,11 @@ jobs:
           grep -Fq 'tjsv_workflow_revision::augment_tjsv_workflow_revision_audit(options, report)' "$dispatcher"
           grep -Fq 'runtime_toml_env_boundary::augment_runtime_toml_env_boundary_audit(options, report)' "$dispatcher"
 
-      - name: Reconstruct and prove exact Rust 1.95 product source
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          recon="$RUNNER_TEMP/ores-cli-tjsv-command-scope"
-          rm -rf "$recon"
-          cp -a "$CERT_ROOT" "$recon"
-          python3 "$CERT_ROOT/reconstruct-product-source.py" "$recon/src/tjsv_invocation_scope.rs"
-          test "$(git hash-object "$recon/src/tjsv_invocation_scope.rs")" = "$ORES_CLI_SCOPE_MODULE_BLOB"
-          echo "RECON_ROOT=$recon" >> "$GITHUB_ENV"
-
       - name: Prove first-class authority and command-atomic semantics
         shell: bash
         run: |
           set -Eeuo pipefail
-          module="$RECON_ROOT/src/tjsv_invocation_scope.rs"
+          module="$CERT_ROOT/src/tjsv_invocation_scope.rs"
           grep -Fq 'TypeSpec and Draft 2020-12 JSON Schema remain independent, first-class' "$module"
           grep -Fq 'generated Schema B' "$module"
           grep -Fq 'independently authored' "$module"
@@ -123,19 +110,19 @@ jobs:
           components: rustfmt, clippy
 
       - name: Require formatting
-        run: cargo +1.95.0 fmt --manifest-path "$RECON_ROOT/Cargo.toml" --all -- --check
+        run: cargo +1.95.0 fmt --manifest-path "$CERT_ROOT/Cargo.toml" --all -- --check
 
-      - name: Compile exact reconstructed product module
-        run: cargo +1.95.0 check --manifest-path "$RECON_ROOT/Cargo.toml" --all-targets
+      - name: Compile exact product module
+        run: cargo +1.95.0 check --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
 
       - name: Run exact embedded step and command scope regressions
-        run: cargo +1.95.0 test --manifest-path "$RECON_ROOT/Cargo.toml" --all-targets -- --nocapture
+        run: cargo +1.95.0 test --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- --nocapture
 
       - name: Deny warnings under Clippy
-        run: cargo +1.95.0 clippy --manifest-path "$RECON_ROOT/Cargo.toml" --all-targets -- -D warnings
+        run: cargo +1.95.0 clippy --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- -D warnings
 
       - name: Repeat scope regressions optimized
-        run: cargo +1.95.0 test --release --manifest-path "$RECON_ROOT/Cargo.toml" --all-targets
+        run: cargo +1.95.0 test --release --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
 
       - name: Re-run previously certified full-check scanner
         run: cargo +1.95.0 test --manifest-path certification/ores-cli-tjsv-full-check/Cargo.toml --all-targets
@@ -147,7 +134,6 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git hash-object "$CERT_ROOT/src/tjsv_invocation_scope.rs")" = "$ORES_CLI_SCOPE_BASE_BLOB"
+          test "$(git hash-object "$CERT_ROOT/src/tjsv_invocation_scope.rs")" = "$ORES_CLI_SCOPE_MODULE_BLOB"
           test "$(git hash-object "$CERT_ROOT/product-audit-mod.rs")" = "$ORES_CLI_AUDIT_MOD_BLOB"
-          test "$(git hash-object "$RECON_ROOT/src/tjsv_invocation_scope.rs")" = "$ORES_CLI_SCOPE_MODULE_BLOB"
           git diff --exit-code -- "$CERT_ROOT" .github/workflows/ores-cli-tjsv-command-scope.yml
