@@ -48,7 +48,7 @@ jobs:
           jq -e '
             .schema == "zed-pkg-test.ores-cli-tjsv-full-check/v1" and
             .upstream.repository == "ORESoftware/ores-cli" and
-            .upstream.pullRequest == 177 and
+            .upstream.pullRequest == 214 and
             (.upstream.head | test("^[0-9a-f]{40}$")) and
             .upstream.path == "src/audit/tjsv_full_check.rs" and
             (.upstream.blob | test("^[0-9a-f]{40}$")) and
