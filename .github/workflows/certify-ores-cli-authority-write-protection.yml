@@ -1,0 +1,95 @@
+name: certify ores-cli authored-authority write protection
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/certify-ores-cli-authority-write-protection.yml'
+      - 'evidence/ores-cli-authority-write-protection.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact test head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Check out exact ores-cli product head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ORESoftware/ores-cli
+          ref: c822fa947cb4c2b005d1210617588c0027f43a0c
+          path: product
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact source and dispatcher identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C product rev-parse HEAD)" = 'c822fa947cb4c2b005d1210617588c0027f43a0c'
+          test "$(git -C product hash-object src/audit/authority_write_protection.rs)" = 'a37e741ded61e1ffe872b305833a598f77429e6e'
+          test "$(git -C product hash-object src/audit/mod.rs)" = '04c11a5b29cc80a176598f07af81bd89ccd3584a'
+          jq -e '
+            .productHead == "c822fa947cb4c2b005d1210617588c0027f43a0c"
+            and .sourceBlob == "a37e741ded61e1ffe872b305833a598f77429e6e"
+            and .dispatcherBlob == "04c11a5b29cc80a176598f07af81bd89ccd3584a"
+            and .authority.typespec == "independent-first-class"
+            and .authority.jsonSchema == "independent-draft-2020-12-first-class"
+            and .authority.generatedSchemaB == "comparison-evidence-only"
+          ' evidence/ores-cli-authority-write-protection.json >/dev/null
+          grep -Fxq 'mod authority_write_protection;' product/src/audit/mod.rs
+          identity_line="$(grep -nF 'peer_authority_identity::augment_peer_authority_identity_audit(structural, report)' product/src/audit/mod.rs | cut -d: -f1)"
+          write_line="$(grep -nF 'authority_write_protection::augment_authority_write_protection_audit(' product/src/audit/mod.rs | cut -d: -f1)"
+          generated_line="$(grep -nF 'contract_generated_evidence::augment_contract_generated_evidence_audit(' product/src/audit/mod.rs | cut -d: -f1)"
+          test -n "$identity_line" -a -n "$write_line" -a -n "$generated_line"
+          test "$identity_line" -lt "$write_line"
+          test "$write_line" -lt "$generated_line"
+
+      - name: Install Rust 1.95
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.95.0
+          components: rustfmt, clippy
+
+      - name: Run exact product gates
+        shell: bash
+        working-directory: product
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo test --locked authority_write_protection -- --nocapture
+          cargo test --locked --release authority_write_protection -- --nocapture
+          cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Require focused regression inventory
+        shell: bash
+        working-directory: product
+        run: |
+          set -euo pipefail
+          tests="$(cargo test --locked authority_write_protection -- --list)"
+          for name in \
+            rejects_shell_overwrite_of_authored_json_schema \
+            rejects_shell_overwrite_of_authored_typespec \
+            rejects_programmatic_write_to_authored_peer \
+            allows_tjsv_reads_and_generated_json_output \
+            allows_hash_and_compare_of_both_authored_peers \
+            ignores_commented_write_examples
+          do
+            grep -Fq "$name" <<<"$tests"
+          done
+
+      - name: Preserve product and test source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C product diff --exit-code
+          git diff --exit-code -- .github/workflows/certify-ores-cli-authority-write-protection.yml evidence/ores-cli-authority-write-protection.json
