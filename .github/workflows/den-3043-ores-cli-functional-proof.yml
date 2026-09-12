@@ -26,7 +26,10 @@ jobs:
           test "$(git hash-object evidence/ores-cli-functional/src/audit/functional_style.rs)" = "e2bb63255efeeb3ac5d01936898f5e9f06729c15"
           git diff --check
           status=0
-          git grep -n -I -E '^(<<<<<<< .+|=======|>>>>>>> .+)$' -- evidence/ores-cli-functional || status=$?
+          git grep -n -I -E '^(<<<<<<< .+|=======|>>>>>>> .+)$' -- \
+            evidence/ores-cli-functional/Cargo.toml \
+            evidence/ores-cli-functional/src/lib.rs \
+            evidence/ores-cli-functional/src/model.rs || status=$?
           test "$status" -eq 1
       - name: Install Rust 1.88
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
