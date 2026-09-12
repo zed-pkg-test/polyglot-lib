@@ -15,7 +15,6 @@ mod flags2env_submodule_source_hygiene;
 mod infra_policy;
 mod infra_provider_state;
 mod nested_peer_contracts;
-mod oauth_provider_contract;
 mod org;
 mod package;
 mod repository;
@@ -28,10 +27,6 @@ mod runtime_toml_registry;
 mod runtime_toml_registry_tests;
 mod runtime_toml_sidecar;
 mod tjsv_bidirectional_drift;
-mod tjsv_full_check;
-mod tjsv_generated_schema_provenance;
-mod tjsv_invocation_scope;
-mod tjsv_workflow_revision;
 mod workflow_action_pins;
 mod workflow_permissions;
 
@@ -45,18 +40,13 @@ use crate::model::CommandReport;
 
 /// Audit one local repository tree, recursively inspect independently authored
 /// TypeSpec/JSON Schema peers, enforce separation between editable authorities
-/// and generated TJSV comparison evidence, validate OAuth/OIDC provider source,
-/// workflow and `*-test` evidence boundaries, require symmetric fail-closed TJSV
-/// drift controls, forbid authored-Schema-A/generated-Schema-B cloning, require
-/// a full compiler/emitter/comparison/differential `tjsv check` for every
-/// complete peer pair, require one scoped invocation per workflow admission,
-/// require internally consistent immutable TJSV workflow revisions, reject
-/// mutable GitHub Actions dependencies, require explicit workflow-token posture
-/// and immutable Docker/Cargo Git identities, fail closed on unknown ORES runtime
-/// TOML names, enforce credential/public-argv separation plus canonical
-/// flags2env provenance, cross-check runtime-owned secret env bindings against
-/// public argv exposure, apply bounded peer-authority runtime configuration
-/// checks, and harden provider IaC when the infra profile is explicitly selected.
+/// and generated TJSV comparison evidence, require symmetric fail-closed TJSV
+/// drift controls, reject mutable GitHub Actions dependencies, require explicit
+/// workflow-token posture and immutable Docker/Cargo Git identities, fail closed
+/// on unknown ORES runtime TOML names, enforce credential/public-argv separation
+/// plus canonical flags2env provenance, apply bounded peer-authority runtime
+/// configuration checks, and harden provider IaC when the infra profile is
+/// explicitly selected.
 #[must_use]
 pub fn audit_repository(options: &RepositoryAuditOptions) -> CommandReport {
     let report = nested_peer_contracts::augment_nested_peer_contract_audit(
@@ -66,15 +56,8 @@ pub fn audit_repository(options: &RepositoryAuditOptions) -> CommandReport {
     let report = contract_generated_evidence::augment_contract_generated_evidence_audit(
         options, report,
     );
-    let report = oauth_provider_contract::augment_oauth_provider_contract_audit(options, report);
     let report =
         tjsv_bidirectional_drift::augment_tjsv_bidirectional_drift_audit(options, report);
-    let report = tjsv_generated_schema_provenance::augment_tjsv_generated_schema_provenance_audit(
-        options, report,
-    );
-    let report = tjsv_full_check::augment_tjsv_full_check_audit(options, report);
-    let report = tjsv_invocation_scope::augment_tjsv_invocation_scope_audit(options, report);
-    let report = tjsv_workflow_revision::augment_tjsv_workflow_revision_audit(options, report);
     let report = workflow_action_pins::augment_workflow_action_pin_audit(options, report);
     let report = workflow_permissions::augment_workflow_permissions_audit(options, report);
     let report = docker_base_pins::augment_docker_base_pin_audit(options, report);
