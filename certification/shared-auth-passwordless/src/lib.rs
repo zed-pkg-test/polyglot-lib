@@ -30,18 +30,22 @@ mod tests {
 
     #[test]
     fn rejects_legacy_token_only_body() {
-        assert!(serde_json::from_str::<PasswordlessConsumeRequest>(
-            r#"{"token":"sat_magic_example"}"#,
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<PasswordlessConsumeRequest>(
+                r#"{"token":"sat_magic_example"}"#,
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn rejects_mixed_otp_and_legacy_token_body() {
-        assert!(serde_json::from_str::<PasswordlessConsumeRequest>(
-            r#"{"email":"user@example.com","otp":"123456","token":"sat_magic_example"}"#,
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<PasswordlessConsumeRequest>(
+                r#"{"email":"user@example.com","otp":"123456","token":"sat_magic_example"}"#,
+            )
+            .is_err()
+        );
     }
 
     #[test]
