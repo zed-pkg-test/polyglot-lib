@@ -97,8 +97,9 @@ pub mod audit {
         pub additional_required_paths: Vec<String>,
     }
 
-    #[path = "../tjsv_full_check.rs"]
-    mod tjsv_full_check;
+    mod tjsv_full_check {
+        include!("tjsv_full_check.rs");
+    }
 
     #[cfg(test)]
     mod certification_tests {
