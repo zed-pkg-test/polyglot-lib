@@ -1,0 +1,62 @@
+name: ores-cli TJSV full-check canary
+
+on:
+  pull_request:
+    paths:
+      - 'canaries/ores-cli-tjsv-full-check/**'
+      - '.github/workflows/ores-cli-tjsv-full-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-tjsv-full-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify-exact-product-slice:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact review head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Validate canary workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/ores-cli-tjsv-full-check.yml
+
+      - name: Prove exact ores-cli candidate blobs and dispatcher wiring
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          root='canaries/ores-cli-tjsv-full-check'
+          test "$(git hash-object "$root/src/audit/tjsv_full_check.rs")" = '41b5fc7ace31717fbb4980e728225d7b656ad979'
+          test "$(git hash-object "$root/product-audit-mod.rs")" = '6174f65a07145bd0f2b0624a94a5f578a45a3de1'
+          grep -Fqx 'mod tjsv_full_check;' "$root/product-audit-mod.rs"
+          grep -Fq 'tjsv_full_check::augment_tjsv_full_check_audit(options, report)' "$root/product-audit-mod.rs"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.90.0'
+          components: rustfmt, clippy
+
+      - name: Format exact module and canary harness
+        run: cargo +1.90.0 fmt --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all -- --check
+
+      - name: Compile canary harness
+        run: cargo +1.90.0 check --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
+
+      - name: Run exact embedded product regressions
+        run: cargo +1.90.0 test --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
+
+      - name: Deny warnings under Clippy
+        run: cargo +1.90.0 clippy --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets -- -D warnings
+
+      - name: Repeat regressions optimized
+        run: cargo +1.90.0 test --release --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
