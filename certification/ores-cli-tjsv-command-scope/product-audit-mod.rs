@@ -9,6 +9,7 @@ mod contract_evidence;
 #[cfg(test)]
 mod contract_evidence_tests;
 mod contract_generated_evidence;
+mod contract_tree;
 mod docker_base_pins;
 mod flags2env_source_hygiene;
 mod flags2env_submodule_source_hygiene;
@@ -18,6 +19,7 @@ mod nested_peer_contracts;
 mod oauth_provider_contract;
 mod org;
 mod package;
+mod peer_authority_identity;
 mod repository;
 mod runtime_toml_env_boundary;
 mod runtime_toml_indiebuild;
@@ -38,31 +40,34 @@ mod workflow_permissions;
 use std::path::PathBuf;
 
 pub use contract::audit_contract;
+pub use contract_tree::audit_contract_tree;
 pub use org::audit_github_org;
 pub use package::audit_package;
 
 use crate::model::CommandReport;
 
 /// Audit one local repository tree, recursively inspect independently authored
-/// TypeSpec/JSON Schema peers, enforce separation between editable authorities
-/// and generated TJSV comparison evidence, validate OAuth/OIDC provider source,
-/// workflow and `*-test` evidence boundaries, require symmetric fail-closed TJSV
-/// drift controls, forbid authored-Schema-A/generated-Schema-B cloning, require
-/// a full compiler/emitter/comparison/differential `tjsv check` for every
-/// complete peer pair, require one scoped invocation per workflow admission,
-/// require internally consistent immutable TJSV workflow revisions, reject
-/// mutable GitHub Actions dependencies, require explicit workflow-token posture
-/// and immutable Docker/Cargo Git identities, fail closed on unknown ORES runtime
-/// TOML names, enforce credential/public-argv separation plus canonical
-/// flags2env provenance, cross-check runtime-owned secret env bindings against
-/// public argv exposure, apply bounded peer-authority runtime configuration
-/// checks, and harden provider IaC when the infra profile is explicitly selected.
+/// TypeSpec/JSON Schema peers, enforce physical independence plus separation
+/// between editable authorities and generated TJSV comparison evidence, validate
+/// OAuth/OIDC provider source, workflow and `*-test` evidence boundaries,
+/// require symmetric fail-closed TJSV drift controls, forbid authored-Schema-A/
+/// generated-Schema-B cloning, require a full compiler/emitter/comparison/
+/// differential `tjsv check` for every complete peer pair, require one scoped
+/// invocation per workflow admission, require internally consistent immutable
+/// TJSV workflow revisions, reject mutable GitHub Actions dependencies, require
+/// explicit workflow-token posture and immutable Docker/Cargo Git identities,
+/// fail closed on unknown ORES runtime TOML names, enforce credential/public-argv
+/// separation plus canonical flags2env provenance, cross-check runtime-owned
+/// secret env bindings against public argv exposure, apply bounded peer-authority
+/// runtime configuration checks, and harden provider IaC when the infra profile
+/// is explicitly selected.
 #[must_use]
 pub fn audit_repository(options: &RepositoryAuditOptions) -> CommandReport {
     let report = nested_peer_contracts::augment_nested_peer_contract_audit(
         options,
         repository::audit_repository(options),
     );
+    let report = peer_authority_identity::augment_peer_authority_identity_audit(options, report);
     let report = contract_generated_evidence::augment_contract_generated_evidence_audit(
         options, report,
     );
@@ -135,6 +140,17 @@ pub struct RepositoryAuditOptions {
     pub profile: String,
     /// Additional required paths.
     pub additional_required_paths: Vec<String>,
+}
+
+/// Options for whole-repository TypeSpec/JSON Schema parity validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContractTreeAuditOptions {
+    /// Repository root containing `contracts/`.
+    pub path: PathBuf,
+    /// Root directory for generated/parity evidence.
+    pub report_root: PathBuf,
+    /// Validator executable.
+    pub validator: String,
 }
 
 /// Options for Cargo/zed-pkg metadata parity.
