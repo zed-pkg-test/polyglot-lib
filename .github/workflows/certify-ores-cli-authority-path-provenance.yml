@@ -28,12 +28,12 @@ jobs:
         run: |
           set -euo pipefail
           root=certification/ores-cli-authority-path-provenance
-          test "$(git hash-object "$root/src/audit/peer_authority_paths.rs")" = '2d4e67fe7e05e6dd7982403981485f6d5a3d662b'
+          test "$(git hash-object "$root/src/audit/peer_authority_paths.rs")" = '75c08eeac4583f43be300e8a44b523d142920b59'
           jq -e '
             .repository == "ORESoftware/ores-cli"
             and .pullRequest == 273
-            and .productHead == "64a7451ef582705bf8efc75563fe98a185aa8c76"
-            and .sourceBlob == "2d4e67fe7e05e6dd7982403981485f6d5a3d662b"
+            and .productHead == "d29fa47547c5ddc0501e169ed06a783cb18c0aa2"
+            and .sourceBlob == "75c08eeac4583f43be300e8a44b523d142920b59"
             and .dispatcherBlob == "baf3459d48cb41d0b4c9e237bac276012530d1f5"
             and .authority.typespec == "independent-first-class"
             and .authority.jsonSchema == "independent-draft-2020-12-first-class"
