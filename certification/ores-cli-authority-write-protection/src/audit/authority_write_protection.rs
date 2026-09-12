@@ -165,10 +165,8 @@ fn looks_like_write(line: &str) -> bool {
     let shell_copy_or_move = ["cp ", "mv ", "install "]
         .iter()
         .any(|prefix| line.trim_start().starts_with(prefix));
-    let redirect = line.contains(">>")
-        || line.contains(" > ")
-        || line.contains(">\"")
-        || line.contains(">' ");
+    let redirect =
+        line.contains(">>") || line.contains(" > ") || line.contains(">\"") || line.contains(">' ");
     let output_flag = line.contains("--output=") || line.contains("--output ");
     let write_api = [
         "writefilesync(",
@@ -240,10 +238,12 @@ mod tests {
             "scripts/generate.sh",
             "cp generated/schema.json contracts/account/authored.schema.json\n",
         );
-        assert!(report
-            .findings
-            .iter()
-            .any(|finding| finding.code == "peer-authority-direct-write"));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == "peer-authority-direct-write")
+        );
     }
 
     #[test]
@@ -252,10 +252,12 @@ mod tests {
             ".github/workflows/ci.yml",
             "run: cat generated.tsp > contracts/account/main.tsp\n",
         );
-        assert!(report
-            .findings
-            .iter()
-            .any(|finding| finding.code == "peer-authority-direct-write"));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == "peer-authority-direct-write")
+        );
     }
 
     #[test]
@@ -264,10 +266,12 @@ mod tests {
             "tools/generate.mjs",
             "fs.writeFileSync('contracts/account/authored.schema.json', body);\n",
         );
-        assert!(report
-            .findings
-            .iter()
-            .any(|finding| finding.code == "peer-authority-direct-write"));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == "peer-authority-direct-write")
+        );
     }
 
     #[test]
