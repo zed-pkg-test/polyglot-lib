@@ -74,12 +74,7 @@ pub(super) fn augment_split_peer_contract_audit(
                     if slice.is_empty() {
                         continue;
                     }
-                    if !insert_candidate(
-                        &mut slices,
-                        slice,
-                        &mut overflow_reported,
-                        &mut report,
-                    ) {
+                    if !insert_candidate(&mut slices, slice, &mut overflow_reported, &mut report) {
                         continue;
                     }
                     slices.entry(slice.to_owned()).or_default().typespec = Some(entry.path());
@@ -106,12 +101,7 @@ pub(super) fn augment_split_peer_contract_audit(
                     if slice.is_empty() {
                         continue;
                     }
-                    if !insert_candidate(
-                        &mut slices,
-                        slice,
-                        &mut overflow_reported,
-                        &mut report,
-                    ) {
+                    if !insert_candidate(&mut slices, slice, &mut overflow_reported, &mut report) {
                         continue;
                     }
                     slices.entry(slice.to_owned()).or_default().schema = Some(entry.path());
@@ -481,10 +471,12 @@ mod tests {
             let typespec = root.join("contracts/typespec");
             fs::write(typespec.join("main.tsp"), "import \"./identity.tsp\";\n")
                 .expect("aggregate TypeSpec");
-            fs::write(typespec.join("ores.tsp"), "namespace Ores;\n")
-                .expect("support TypeSpec");
-            fs::write(typespec.join("ores-decorators.js"), "export function noop() {}\n")
-                .expect("decorator runtime");
+            fs::write(typespec.join("ores.tsp"), "namespace Ores;\n").expect("support TypeSpec");
+            fs::write(
+                typespec.join("ores-decorators.js"),
+                "export function noop() {}\n",
+            )
+            .expect("decorator runtime");
         });
         assert_eq!(report.issue_count(), 0, "{:#?}", report.findings);
         assert_eq!(
