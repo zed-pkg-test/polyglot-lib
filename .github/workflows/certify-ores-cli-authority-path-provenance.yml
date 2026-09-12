@@ -1,0 +1,77 @@
+name: certify ores-cli authority path provenance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/certify-ores-cli-authority-path-provenance.yml'
+      - 'evidence/ores-cli-authority-path-provenance.json'
+      - 'certification/ores-cli-authority-path-provenance/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact certification head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact product source binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=certification/ores-cli-authority-path-provenance
+          test "$(git hash-object "$root/src/audit/peer_authority_paths.rs")" = '2d4e67fe7e05e6dd7982403981485f6d5a3d662b'
+          jq -e '
+            .repository == "ORESoftware/ores-cli"
+            and .pullRequest == 273
+            and .productHead == "64a7451ef582705bf8efc75563fe98a185aa8c76"
+            and .sourceBlob == "2d4e67fe7e05e6dd7982403981485f6d5a3d662b"
+            and .dispatcherBlob == "baf3459d48cb41d0b4c9e237bac276012530d1f5"
+            and .authority.typespec == "independent-first-class"
+            and .authority.jsonSchema == "independent-draft-2020-12-first-class"
+            and .authority.generatedSchemaB == "comparison-evidence-only"
+            and .authority.precedence == "none"
+          ' evidence/ores-cli-authority-path-provenance.json >/dev/null
+
+      - name: Install Rust 1.95
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.95.0
+          components: rustfmt, clippy
+
+      - name: Execute exact vendored product module
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=certification/ores-cli-authority-path-provenance/Cargo.toml
+          cargo fmt --manifest-path "$manifest" --all -- --check
+          cargo clippy --manifest-path "$manifest" --all-targets -- -D warnings
+          cargo test --manifest-path "$manifest" --all-targets
+          cargo test --release --manifest-path "$manifest" --all-targets
+
+      - name: Require focused generated-path inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=certification/ores-cli-authority-path-provenance/Cargo.toml
+          tests="$(cargo test --manifest-path "$manifest" --all-targets -- --list)"
+          for name in \
+            accepts_independently_authored_peer_locations \
+            rejects_generated_typespec_authority \
+            rejects_generated_json_schema_authority \
+            rejects_build_and_tjsv_evidence_locations \
+            generated_witness_filename_is_not_misclassified_as_authored_schema
+          do
+            grep -Fq "$name" <<<"$tests"
+          done
+
+      - name: Preserve exact certification source
+        run: git diff --exit-code -- .github/workflows/certify-ores-cli-authority-path-provenance.yml evidence/ores-cli-authority-path-provenance.json certification/ores-cli-authority-path-provenance
