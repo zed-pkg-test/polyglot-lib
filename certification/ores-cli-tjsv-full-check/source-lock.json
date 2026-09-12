@@ -2,8 +2,8 @@
   "schema": "zed-pkg-test.ores-cli-tjsv-full-check/v1",
   "upstream": {
     "repository": "ORESoftware/ores-cli",
-    "pullRequest": 177,
-    "head": "6e29a4e0650ef2fd84432b835caf16810710b6bf",
+    "pullRequest": 214,
+    "head": "85e3ebd2fc8f99592336992540b7afbac71d9f53",
     "path": "src/audit/tjsv_full_check.rs",
     "blob": "60e851132201be94fdd14d92939e88600c74adc7"
   },
