@@ -80,7 +80,10 @@ pub(super) fn augment_peer_authority_path_audit(
             break;
         }
 
-        let relative = entry.path().strip_prefix(&options.path).unwrap_or(entry.path());
+        let relative = entry
+            .path()
+            .strip_prefix(&options.path)
+            .unwrap_or(entry.path());
         if first_non_authored_component(relative).is_some() {
             let target = relative.to_string_lossy().replace('\\', "/");
             if rejected_paths.insert(target.clone()) {
@@ -163,10 +166,7 @@ mod tests {
     fn accepts_independently_authored_peer_locations() {
         let report = audit(|root| {
             write_authority(&root.join("contracts/account"), "main.tsp");
-            write_authority(
-                &root.join("contracts/account"),
-                "authored.schema.json",
-            );
+            write_authority(&root.join("contracts/account"), "authored.schema.json");
         });
         assert_eq!(report.issue_count(), 0, "{:#?}", report.findings);
     }
@@ -214,11 +214,8 @@ mod tests {
         let report = audit(|root| {
             let evidence = root.join("contracts/account/generated");
             fs::create_dir_all(&evidence).expect("evidence directory");
-            fs::write(
-                evidence.join("typespec.generated.schema.json"),
-                "{}\n",
-            )
-            .expect("generated witness");
+            fs::write(evidence.join("typespec.generated.schema.json"), "{}\n")
+                .expect("generated witness");
         });
         assert_eq!(report.issue_count(), 0, "{:#?}", report.findings);
     }
