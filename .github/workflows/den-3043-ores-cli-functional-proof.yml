@@ -20,10 +20,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Verify candidate blob and conflict hygiene
+      - name: Verify exact production lint blob
         run: |
           set -euo pipefail
-          test "$(git hash-object evidence/ores-cli-functional/src/audit/functional_style.rs)" = "e2bb63255efeeb3ac5d01936898f5e9f06729c15"
+          test "$(git hash-object evidence/ores-cli-functional/src/audit/functional_style.rs)" = "37e56c54dec1d4ffdfd697d4e1b2596b5edd303e"
+      - name: Verify evidence harness conflict hygiene
+        run: |
+          set -euo pipefail
           git diff --check
           status=0
           git grep -n -I -E '^(<<<<<<< .+|=======|>>>>>>> .+)$' -- \
