@@ -89,10 +89,11 @@ fn public_flag_envs(root: &Path, report: &mut CommandReport) -> BTreeSet<String>
 fn collect_flag_envs(value: &Value, path: &mut Vec<String>, envs: &mut BTreeSet<String>) {
     match value {
         Value::Table(table) => {
-            if path.len() >= 2 && path[path.len() - 2] == "flags" {
-                if let Some(env_key) = table.get("env").and_then(Value::as_str) {
-                    envs.insert(env_key.to_owned());
-                }
+            if path.len() >= 2
+                && path[path.len() - 2] == "flags"
+                && let Some(env_key) = table.get("env").and_then(Value::as_str)
+            {
+                envs.insert(env_key.to_owned());
             }
             for (key, child) in table {
                 path.push(key.clone());
