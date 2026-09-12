@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ORES_CLI_CANDIDATE: 165176768e2ab397cdc541c550d8a6fa553f7127
+  ORES_CLI_CANDIDATE: a4fae32b1233650019139b9090f8553ed16c6fad
   ORES_CLI_SCOPE_MODULE_BLOB: 9b7163abfa2c1a9208a48cc5af95ce81e22b2441
-  ORES_CLI_AUDIT_MOD_BLOB: cd355a7e8f9d3d5d6d0f169ebdcc1313c4411f19
+  ORES_CLI_AUDIT_MOD_BLOB: 2b62cc898ebff615146661d534b38eb083078ecf
   CERT_ROOT: certification/ores-cli-tjsv-invocation-scope
 
 jobs:
@@ -62,10 +62,12 @@ jobs:
               .authorityModel.comparison == "generated-b-vs-authored-a" and
               .authorityModel.precedence == "none"
             ' "$lock"
+          grep -Fqx 'mod oauth_provider_contract;' "$dispatcher"
           grep -Fqx 'mod tjsv_bidirectional_drift;' "$dispatcher"
           grep -Fqx 'mod tjsv_full_check;' "$dispatcher"
           grep -Fqx 'mod tjsv_invocation_scope;' "$dispatcher"
           grep -Fqx 'mod tjsv_workflow_revision;' "$dispatcher"
+          grep -Fq 'oauth_provider_contract::augment_oauth_provider_contract_audit(options, report)' "$dispatcher"
           grep -Fq 'tjsv_full_check::augment_tjsv_full_check_audit(options, report)' "$dispatcher"
           grep -Fq 'tjsv_invocation_scope::augment_tjsv_invocation_scope_audit(options, report)' "$dispatcher"
           grep -Fq 'tjsv_workflow_revision::augment_tjsv_workflow_revision_audit(options, report)' "$dispatcher"
