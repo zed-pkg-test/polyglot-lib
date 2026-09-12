@@ -102,6 +102,9 @@ pub mod audit {
         include!("tjsv_full_check.rs");
     }
 
+    #[cfg(test)]
+    mod tjsv_full_check_tests;
+
     /// Execute the exact mirrored production scanner through a non-test API.
     #[must_use]
     pub fn certify_repository(path: PathBuf) -> CommandReport {
