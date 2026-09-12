@@ -1,0 +1,121 @@
+name: ores-cli runtime env-boundary canary
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ores-cli-runtime-env-boundary.yml'
+      - 'certification/ores-cli-runtime-env-boundary/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-runtime-env-boundary-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORES_CLI_CANDIDATE: 1af7d4a15f50ffdaef7e09b0beeabcb4e3c90dcd
+  ORES_CLI_RUNTIME_MODULE_BLOB: 572c2e633b15a37fd04a1a641f3423a1438f91ba
+  ORES_CLI_AUDIT_MOD_BLOB: 7e00b188ce5e9bff72619bbb0ea1a007ced583bc
+  CERT_ROOT: certification/ores-cli-runtime-env-boundary
+
+jobs:
+  certify-exact-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact test head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate canary workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/ores-cli-runtime-env-boundary.yml
+
+      - name: Prove exact mirrored product identities and authority policy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          module="$CERT_ROOT/src/runtime_toml_env_boundary.rs"
+          dispatcher="$CERT_ROOT/product-audit-mod.rs"
+          lock="$CERT_ROOT/source-lock.json"
+          test "$(git hash-object "$module")" = "$ORES_CLI_RUNTIME_MODULE_BLOB"
+          test "$(git hash-object "$dispatcher")" = "$ORES_CLI_AUDIT_MOD_BLOB"
+          jq -e --arg commit "$ORES_CLI_CANDIDATE" \
+            --arg module "$ORES_CLI_RUNTIME_MODULE_BLOB" \
+            --arg dispatcher "$ORES_CLI_AUDIT_MOD_BLOB" '
+              .schema == "ores.test.source-lock/v1" and
+              .repository == "ORESoftware/ores-cli" and
+              .pullRequest == 248 and
+              .commit == $commit and
+              .files["src/audit/runtime_toml_env_boundary.rs"] == $module and
+              .files["src/audit/mod.rs"] == $dispatcher and
+              .authorityModel.typespec == "independently-authored-first-class" and
+              .authorityModel.jsonSchema == "independently-authored-first-class" and
+              .authorityModel.typespecProjection == "generated-json-schema-b" and
+              .authorityModel.generatedJsonSchema == "comparison-evidence-only" and
+              .authorityModel.comparison == "generated-b-vs-authored-a" and
+              .authorityModel.precedence == "none" and
+              .composition.runtimeEnvBoundaryWired == true and
+              .composition.flags2envPreserved == true and
+              .composition.tjsvPeerAuthorityPreserved == true and
+              .composition.secretArgvCollisionsRejected == true
+            ' "$lock"
+          grep -Fqx 'mod runtime_toml_env_boundary;' "$dispatcher"
+          grep -Fq 'runtime_toml_env_boundary::augment_runtime_toml_env_boundary_audit(options, report)' "$dispatcher"
+          grep -Fq 'tjsv_bidirectional_drift::augment_tjsv_bidirectional_drift_audit(options, report)' "$dispatcher"
+          grep -Fq 'flags2env_source_hygiene::audit_flags2env_source_hygiene(&options.path, &mut report)' "$dispatcher"
+
+      - name: Prove secret argv boundaries in exact source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          module="$CERT_ROOT/src/runtime_toml_env_boundary.rs"
+          grep -Fq 'runtime-secret-env-exposed-via-cli' "$module"
+          grep -Fq 'runtime-rpc-secret-allows-argv' "$module"
+          grep -Fq '.ores-mw.toml' "$module"
+          grep -Fq '.fanwaave-cfg.toml' "$module"
+          grep -Fq '.ores-rpc.toml' "$module"
+          grep -Fq '.ores-rl.toml' "$module"
+          grep -Fq '.ores-lru.toml' "$module"
+          test "$(git hash-object "$module")" = "$ORES_CLI_RUNTIME_MODULE_BLOB"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.95.0'
+          components: rustfmt, clippy
+
+      - name: Require formatting
+        run: cargo +1.95.0 fmt --manifest-path "$CERT_ROOT/Cargo.toml" --all -- --check
+
+      - name: Compile exact mirrored product module
+        run: cargo +1.95.0 check --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
+
+      - name: Run exact embedded runtime-boundary regressions
+        run: cargo +1.95.0 test --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- --nocapture
+
+      - name: Deny warnings under Clippy
+        run: cargo +1.95.0 clippy --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- -D warnings
+
+      - name: Repeat runtime-boundary regressions optimized
+        run: cargo +1.95.0 test --release --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
+
+      - name: Re-run certified TJSV peer-authority scope scanner
+        run: cargo +1.95.0 test --manifest-path certification/ores-cli-tjsv-invocation-scope/Cargo.toml --all-targets
+
+      - name: Re-run certified TJSV full-check scanner
+        run: cargo +1.95.0 test --manifest-path certification/ores-cli-tjsv-full-check/Cargo.toml --all-targets
+
+      - name: Prove tracked certificate sources remained immutable
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git hash-object "$CERT_ROOT/src/runtime_toml_env_boundary.rs")" = "$ORES_CLI_RUNTIME_MODULE_BLOB"
+          test "$(git hash-object "$CERT_ROOT/product-audit-mod.rs")" = "$ORES_CLI_AUDIT_MOD_BLOB"
+          git diff --exit-code -- "$CERT_ROOT" .github/workflows/ores-cli-runtime-env-boundary.yml
