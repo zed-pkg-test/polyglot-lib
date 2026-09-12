@@ -2,9 +2,9 @@
   "schema": "ores.test.source-lock/v1",
   "repository": "ORESoftware/ores-cli",
   "pullRequest": 227,
-  "commit": "93827083f89d90e2bd2c676e11a1b0904c01aef9",
+  "commit": "878fed163212a748221359e37adb96ae11ee5c2b",
   "files": {
-    "src/audit/runtime_toml_env_boundary.rs": "c9a92566914447c3dd58b62c5543440ae2d75485",
+    "src/audit/runtime_toml_env_boundary.rs": "572c2e633b15a37fd04a1a641f3423a1438f91ba",
     "src/audit/mod.rs": "3cb95e64a0c991f40981db98cc72342a464cbf3d"
   },
   "authorityModel": {
