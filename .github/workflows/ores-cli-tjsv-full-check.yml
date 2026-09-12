@@ -24,6 +24,7 @@ env:
   MANIFEST: certification/ores-cli-tjsv-full-check/Cargo.toml
   LOCKFILE: certification/ores-cli-tjsv-full-check/Cargo.lock
   SOURCE_LOCK: certification/ores-cli-tjsv-full-check/source-lock.json
+  MIRROR: certification/ores-cli-tjsv-full-check/src/tjsv_full_check.rs
 
 jobs:
   certify:
@@ -50,12 +51,15 @@ jobs:
             .upstream.path == "src/audit/tjsv_full_check.rs" and
             (.upstream.blob | test("^[0-9a-f]{40}$")) and
             .mirror.path == "src/tjsv_full_check.rs" and
+            (.mirror.blob | test("^[0-9a-f]{40}$")) and
             .mirror.scope == "executable-production-prefix-before-cfg-test-module" and
             .contract.typespecAuthority == "independently-authored" and
             .contract.jsonSchemaAuthority == "independently-authored" and
             .contract.generatedJsonSchemaRole == "comparison-evidence-only" and
             .contract.authorityPrecedence == "none"
           ' "$SOURCE_LOCK"
+          expected_mirror="$(jq -r '.mirror.blob' "$SOURCE_LOCK")"
+          test "$(git hash-object "$MIRROR")" = "$expected_mirror"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
@@ -63,34 +67,34 @@ jobs:
           toolchain: 1.95.0
           components: rustfmt,clippy
 
-      - name: Bootstrap deterministic dependency lock for review
+      - name: Verify committed dependency closure
         shell: bash
         run: |
           set -euo pipefail
-          cargo generate-lockfile --manifest-path "$MANIFEST"
-          echo '----- BEGIN CERTIFICATE CARGO.LOCK -----'
-          cat "$LOCKFILE"
-          echo '----- END CERTIFICATE CARGO.LOCK -----'
+          test -s "$LOCKFILE"
+          cargo metadata --manifest-path "$MANIFEST" --locked --no-deps > /dev/null
 
       - name: Check formatting
         run: cargo fmt --manifest-path "$MANIFEST" -- --check
 
       - name: Compile and execute production scanner plus adversarial cases
-        run: cargo test --manifest-path "$MANIFEST" --all-targets
+        run: cargo test --manifest-path "$MANIFEST" --all-targets --locked
 
       - name: Lint certificate harness
-        run: cargo clippy --manifest-path "$MANIFEST" --all-targets -- -D warnings
+        run: cargo clippy --manifest-path "$MANIFEST" --all-targets --locked -- -D warnings
 
-      - name: Prove source mirror and harness stayed immutable
+      - name: Prove source mirror, lock, and harness stayed immutable
         run: |
           set -euo pipefail
           git diff --check
           git diff --exit-code -- \
             certification/ores-cli-tjsv-full-check/Cargo.toml \
+            certification/ores-cli-tjsv-full-check/Cargo.lock \
             certification/ores-cli-tjsv-full-check/source-lock.json \
             certification/ores-cli-tjsv-full-check/src
+          test -z "$(git status --porcelain --untracked-files=no)"
 
-      - name: Retain bootstrap lock for review
+      - name: Retain certificate lock
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
