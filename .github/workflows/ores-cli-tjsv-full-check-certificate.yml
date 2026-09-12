@@ -1,0 +1,112 @@
+name: ores-cli TJSV full-check adversarial certificate
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ores-cli-tjsv-full-check-certificate.yml"
+      - "certification/ores-cli-tjsv-full-check/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ores-cli-tjsv-full-check-certificate.yml"
+      - "certification/ores-cli-tjsv-full-check/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-tjsv-full-check-certificate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  MANIFEST: certification/ores-cli-tjsv-full-check/Cargo.toml
+  LOCKFILE: certification/ores-cli-tjsv-full-check/Cargo.lock
+  SOURCE_LOCK: certification/ores-cli-tjsv-full-check/source-lock.json
+  MIRROR: certification/ores-cli-tjsv-full-check/src/tjsv_full_check.rs
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact test candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Validate certificate workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/ores-cli-tjsv-full-check-certificate.yml
+
+      - name: Verify exact candidate and provenance boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test -d certification/ores-cli-tjsv-full-check/src/audit
+          test -s certification/ores-cli-tjsv-full-check/src/audit/README.md
+          jq -e '
+            .schema == "zed-pkg-test.ores-cli-tjsv-full-check/v1" and
+            .upstream.repository == "ORESoftware/ores-cli" and
+            .upstream.pullRequest == 177 and
+            .upstream.head == "6e29a4e0650ef2fd84432b835caf16810710b6bf" and
+            .upstream.path == "src/audit/tjsv_full_check.rs" and
+            .upstream.blob == "60e851132201be94fdd14d92939e88600c74adc7" and
+            .mirror.path == "src/tjsv_full_check.rs" and
+            (.mirror.blob | test("^[0-9a-f]{40}$")) and
+            .mirror.scope == "executable-production-prefix-before-cfg-test-module" and
+            .contract.typespecAuthority == "independently-authored" and
+            .contract.jsonSchemaAuthority == "independently-authored" and
+            .contract.generatedJsonSchemaRole == "comparison-evidence-only" and
+            .contract.authorityPrecedence == "none"
+          ' "$SOURCE_LOCK"
+          expected_mirror="$(jq -r '.mirror.blob' "$SOURCE_LOCK")"
+          test "$(git hash-object "$MIRROR")" = "$expected_mirror"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.95.0
+          components: rustfmt,clippy
+
+      - name: Verify committed dependency closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$LOCKFILE"
+          cargo metadata --manifest-path "$MANIFEST" --locked --no-deps --format-version 1 > /dev/null
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path "$MANIFEST" -- --check
+
+      - name: Compile and execute production scanner plus adversarial cases
+        run: cargo test --manifest-path "$MANIFEST" --all-targets --locked
+
+      - name: Lint certificate harness
+        run: cargo clippy --manifest-path "$MANIFEST" --all-targets --locked -- -D warnings
+
+      - name: Prove source mirror, lock, and harness stayed immutable
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code -- \
+            certification/ores-cli-tjsv-full-check/Cargo.toml \
+            certification/ores-cli-tjsv-full-check/Cargo.lock \
+            certification/ores-cli-tjsv-full-check/source-lock.json \
+            certification/ores-cli-tjsv-full-check/src
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Retain certificate lock
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ores-cli-tjsv-full-check-lock-${{ github.run_id }}
+          path: ${{ env.LOCKFILE }}
+          if-no-files-found: warn
+          retention-days: 7
