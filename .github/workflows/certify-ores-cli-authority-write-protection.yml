@@ -28,10 +28,10 @@ jobs:
         run: |
           set -euo pipefail
           root=certification/ores-cli-authority-write-protection
-          test "$(git hash-object "$root/src/audit/authority_write_protection.rs")" = 'a37e741ded61e1ffe872b305833a598f77429e6e'
+          test "$(git hash-object "$root/src/audit/authority_write_protection.rs")" = 'ff68af00ebf17a86d30b27a61dfd6ba26f5824fb'
           jq -e '
-            .productHead == "c822fa947cb4c2b005d1210617588c0027f43a0c"
-            and .sourceBlob == "a37e741ded61e1ffe872b305833a598f77429e6e"
+            .productHead == "542fc4952fe111b306a026f7997f85c155fcc04b"
+            and .sourceBlob == "ff68af00ebf17a86d30b27a61dfd6ba26f5824fb"
             and .dispatcherBlob == "04c11a5b29cc80a176598f07af81bd89ccd3584a"
             and .authority.typespec == "independent-first-class"
             and .authority.jsonSchema == "independent-draft-2020-12-first-class"
