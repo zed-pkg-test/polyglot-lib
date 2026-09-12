@@ -1,0 +1,90 @@
+name: ores-cli TJSV workflow revision canary
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ores-cli-tjsv-workflow-revision.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-tjsv-workflow-revision-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORES_CLI_CANDIDATE: 7cd37926e3eb520eec27b95ff27b738ad87e62b8
+  ORES_CLI_REVISION_MODULE_BLOB: 8f3fadfad66824e84e03b9f342a96efbf673102b
+  ORES_CLI_AUDIT_MOD_BLOB: 01c2fe8155ce2cb25c5133646d4be6da1c1e3e58
+
+jobs:
+  certify-exact-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact canary head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate canary workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/ores-cli-tjsv-workflow-revision.yml
+
+      - name: Check out exact ores-cli candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ORESoftware/ores-cli
+          ref: ${{ env.ORES_CLI_CANDIDATE }}
+          path: product
+          persist-credentials: false
+          show-progress: false
+          fetch-depth: 1
+
+      - name: Prove exact product identity and dispatcher wiring
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git -C product rev-parse HEAD)" = "$ORES_CLI_CANDIDATE"
+          test "$(git -C product hash-object src/audit/tjsv_workflow_revision.rs)" = "$ORES_CLI_REVISION_MODULE_BLOB"
+          test "$(git -C product hash-object src/audit/mod.rs)" = "$ORES_CLI_AUDIT_MOD_BLOB"
+          grep -Fqx 'mod tjsv_workflow_revision;' product/src/audit/mod.rs
+          grep -Fq 'tjsv_workflow_revision::augment_tjsv_workflow_revision_audit(options, report)' product/src/audit/mod.rs
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.90.0'
+          components: rustfmt, clippy
+
+      - name: Require formatting
+        working-directory: product
+        run: cargo +1.90.0 fmt --all -- --check
+
+      - name: Compile locked library target
+        working-directory: product
+        run: cargo +1.90.0 check --locked --lib
+
+      - name: Run exact TJSV workflow revision regressions
+        working-directory: product
+        run: cargo +1.90.0 test --locked --lib tjsv_workflow_revision -- --nocapture
+
+      - name: Deny warnings under Clippy
+        working-directory: product
+        run: cargo +1.90.0 clippy --locked --lib -- -D warnings
+
+      - name: Prove authority semantics are encoded in the exact module
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          grep -Fq 'TypeSpec and independently authored Draft 2020-12 JSON Schema remain equal' product/src/audit/tjsv_workflow_revision.rs
+          grep -Fq 'generated JSON' product/src/audit/tjsv_workflow_revision.rs
+          grep -Fq 'comparison-only evidence' product/src/audit/tjsv_workflow_revision.rs
+          grep -Fq 'COMMIT_HEX_LENGTH: usize = 40' product/src/audit/tjsv_workflow_revision.rs
+
+      - name: Prove product checkout remained immutable
+        run: git -C product diff --exit-code -- .
