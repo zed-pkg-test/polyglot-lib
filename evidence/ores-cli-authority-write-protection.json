@@ -2,9 +2,9 @@
   "schema": "ores.test.exact-source-certification/v1",
   "repository": "ORESoftware/ores-cli",
   "pullRequest": 269,
-  "productHead": "c822fa947cb4c2b005d1210617588c0027f43a0c",
+  "productHead": "542fc4952fe111b306a026f7997f85c155fcc04b",
   "sourcePath": "src/audit/authority_write_protection.rs",
-  "sourceBlob": "a37e741ded61e1ffe872b305833a598f77429e6e",
+  "sourceBlob": "ff68af00ebf17a86d30b27a61dfd6ba26f5824fb",
   "dispatcherPath": "src/audit/mod.rs",
   "dispatcherBlob": "04c11a5b29cc80a176598f07af81bd89ccd3584a",
   "authority": {
