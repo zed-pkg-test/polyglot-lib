@@ -35,7 +35,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           root='canaries/ores-cli-tjsv-full-check'
-          test "$(git hash-object "$root/src/audit/tjsv_full_check.rs")" = '83c392bd327d9d7df1fefcef98d5f2f49e7ab8c0'
+          test "$(git hash-object "$root/src/audit/tjsv_full_check.rs")" = '60e851132201be94fdd14d92939e88600c74adc7'
           test "$(git hash-object "$root/product-audit-mod.rs")" = '6174f65a07145bd0f2b0624a94a5f578a45a3de1'
           grep -Fqx 'mod tjsv_full_check;' "$root/product-audit-mod.rs"
           grep -Fq 'tjsv_full_check::augment_tjsv_full_check_audit(options, report)' "$root/product-audit-mod.rs"
@@ -43,20 +43,20 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
-          toolchain: '1.90.0'
+          toolchain: '1.95.0'
           components: rustfmt, clippy
 
       - name: Format exact module and canary harness
-        run: cargo +1.90.0 fmt --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all -- --check
+        run: cargo +1.95.0 fmt --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all -- --check
 
       - name: Compile canary harness
-        run: cargo +1.90.0 check --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
+        run: cargo +1.95.0 check --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
 
       - name: Run exact embedded product regressions
-        run: cargo +1.90.0 test --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
+        run: cargo +1.95.0 test --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
 
       - name: Deny warnings under Clippy
-        run: cargo +1.90.0 clippy --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets -- -D warnings
+        run: cargo +1.95.0 clippy --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets -- -D warnings
 
       - name: Repeat regressions optimized
-        run: cargo +1.90.0 test --release --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
+        run: cargo +1.95.0 test --release --manifest-path canaries/ores-cli-tjsv-full-check/Cargo.toml --all-targets
