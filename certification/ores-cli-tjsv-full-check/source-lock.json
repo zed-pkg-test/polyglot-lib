@@ -3,12 +3,13 @@
   "upstream": {
     "repository": "ORESoftware/ores-cli",
     "pullRequest": 177,
-    "head": "e097eb43e31bd275419ed6f622e97ba3ed4a23a3",
+    "head": "0611b1853b7225e1cba8adca079e989d6816e051",
     "path": "src/audit/tjsv_full_check.rs",
-    "blob": "41b5fc7ace31717fbb4980e728225d7b656ad979"
+    "blob": "60e851132201be94fdd14d92939e88600c74adc7"
   },
   "mirror": {
     "path": "src/tjsv_full_check.rs",
+    "blob": "a99fb6989e78ac043c485cc62b5ea46a7919639e",
     "scope": "executable-production-prefix-before-cfg-test-module",
     "purpose": "compile the production scanner against an independent model/report harness and add adversarial acceptance cases"
   },
