@@ -1,0 +1,27 @@
+{
+  "schema": "ores.test.source-lock/v1",
+  "repository": "ORESoftware/ores-cli",
+  "pullRequest": 244,
+  "commit": "cca1e76e79a1d233ea7dfd1050abb0ebe9a0d049",
+  "files": {
+    "src/audit/tjsv_invocation_scope.rs": "bd8054b9484fcc57eb231e401b8bb383ad21e880",
+    "src/audit/mod.rs": "7e00b188ce5e9bff72619bbb0ea1a007ced583bc"
+  },
+  "authorityModel": {
+    "typespec": "independently-authored-first-class",
+    "jsonSchema": "independently-authored-first-class",
+    "typespecProjection": "generated-json-schema-b",
+    "generatedJsonSchema": "comparison-evidence-only",
+    "comparison": "generated-b-vs-authored-a",
+    "precedence": "none"
+  },
+  "composition": {
+    "oauthProviderLintPreserved": true,
+    "generatedSchemaProvenancePreserved": true,
+    "fullCheckPreserved": true,
+    "revisionConsistencyPreserved": true,
+    "runtimeEnvBoundaryPreserved": true,
+    "crossStepStitchingRejected": true,
+    "crossCommandStitchingRejected": true
+  }
+}

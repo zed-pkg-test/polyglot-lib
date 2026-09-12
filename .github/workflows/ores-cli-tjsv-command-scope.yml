@@ -1,0 +1,133 @@
+name: ores-cli TJSV command scope canary
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ores-cli-tjsv-command-scope.yml'
+      - 'certification/ores-cli-tjsv-command-scope/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-tjsv-command-scope-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORES_CLI_CANDIDATE: cca1e76e79a1d233ea7dfd1050abb0ebe9a0d049
+  ORES_CLI_SCOPE_MODULE_BLOB: bd8054b9484fcc57eb231e401b8bb383ad21e880
+  ORES_CLI_AUDIT_MOD_BLOB: 7e00b188ce5e9bff72619bbb0ea1a007ced583bc
+  CERT_ROOT: certification/ores-cli-tjsv-command-scope
+
+jobs:
+  certify-exact-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact test head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate canary workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/ores-cli-tjsv-command-scope.yml
+
+      - name: Prove exact mirrored product identities and composition
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          module="$CERT_ROOT/src/tjsv_invocation_scope.rs"
+          dispatcher="$CERT_ROOT/product-audit-mod.rs"
+          lock="$CERT_ROOT/source-lock.json"
+          test "$(git hash-object "$module")" = "$ORES_CLI_SCOPE_MODULE_BLOB"
+          test "$(git hash-object "$dispatcher")" = "$ORES_CLI_AUDIT_MOD_BLOB"
+          jq -e --arg commit "$ORES_CLI_CANDIDATE" \
+            --arg module "$ORES_CLI_SCOPE_MODULE_BLOB" \
+            --arg dispatcher "$ORES_CLI_AUDIT_MOD_BLOB" '
+              .schema == "ores.test.source-lock/v1" and
+              .repository == "ORESoftware/ores-cli" and
+              .pullRequest == 244 and
+              .commit == $commit and
+              .files["src/audit/tjsv_invocation_scope.rs"] == $module and
+              .files["src/audit/mod.rs"] == $dispatcher and
+              .authorityModel.typespec == "independently-authored-first-class" and
+              .authorityModel.jsonSchema == "independently-authored-first-class" and
+              .authorityModel.typespecProjection == "generated-json-schema-b" and
+              .authorityModel.generatedJsonSchema == "comparison-evidence-only" and
+              .authorityModel.comparison == "generated-b-vs-authored-a" and
+              .authorityModel.precedence == "none" and
+              .composition.oauthProviderLintPreserved == true and
+              .composition.generatedSchemaProvenancePreserved == true and
+              .composition.fullCheckPreserved == true and
+              .composition.revisionConsistencyPreserved == true and
+              .composition.runtimeEnvBoundaryPreserved == true and
+              .composition.crossStepStitchingRejected == true and
+              .composition.crossCommandStitchingRejected == true
+            ' "$lock"
+          grep -Fqx 'mod oauth_provider_contract;' "$dispatcher"
+          grep -Fqx 'mod runtime_toml_env_boundary;' "$dispatcher"
+          grep -Fqx 'mod tjsv_generated_schema_provenance;' "$dispatcher"
+          grep -Fqx 'mod tjsv_full_check;' "$dispatcher"
+          grep -Fqx 'mod tjsv_invocation_scope;' "$dispatcher"
+          grep -Fqx 'mod tjsv_workflow_revision;' "$dispatcher"
+          grep -Fq 'oauth_provider_contract::augment_oauth_provider_contract_audit(options, report)' "$dispatcher"
+          grep -Fq 'tjsv_generated_schema_provenance::augment_tjsv_generated_schema_provenance_audit' "$dispatcher"
+          grep -Fq 'tjsv_full_check::augment_tjsv_full_check_audit(options, report)' "$dispatcher"
+          grep -Fq 'tjsv_invocation_scope::augment_tjsv_invocation_scope_audit(options, report)' "$dispatcher"
+          grep -Fq 'tjsv_workflow_revision::augment_tjsv_workflow_revision_audit(options, report)' "$dispatcher"
+          grep -Fq 'runtime_toml_env_boundary::augment_runtime_toml_env_boundary_audit(options, report)' "$dispatcher"
+
+      - name: Prove first-class authority and command-atomic semantics
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          module="$CERT_ROOT/src/tjsv_invocation_scope.rs"
+          grep -Fq 'TypeSpec and Draft 2020-12 JSON Schema remain independent, first-class' "$module"
+          grep -Fq 'generated Schema B' "$module"
+          grep -Fq 'independently authored' "$module"
+          grep -Fq 'Schema A' "$module"
+          grep -Fq 'tjsv-full-check-cross-step-stitching' "$module"
+          grep -Fq 'tjsv-full-check-cross-command-stitching' "$module"
+          grep -Fq 'one atomic workflow action or shell' "$module"
+          test "$(git hash-object "$module")" = "$ORES_CLI_SCOPE_MODULE_BLOB"
+          test "$(git hash-object "$CERT_ROOT/product-audit-mod.rs")" = "$ORES_CLI_AUDIT_MOD_BLOB"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.95.0'
+          components: rustfmt, clippy
+
+      - name: Require formatting
+        run: cargo +1.95.0 fmt --manifest-path "$CERT_ROOT/Cargo.toml" --all -- --check
+
+      - name: Compile exact mirrored product module
+        run: cargo +1.95.0 check --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
+
+      - name: Run exact embedded step and command scope regressions
+        run: cargo +1.95.0 test --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- --nocapture
+
+      - name: Deny warnings under Clippy
+        run: cargo +1.95.0 clippy --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- -D warnings
+
+      - name: Repeat scope regressions optimized
+        run: cargo +1.95.0 test --release --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
+
+      - name: Re-run previously certified full-check scanner
+        run: cargo +1.95.0 test --manifest-path certification/ores-cli-tjsv-full-check/Cargo.toml --all-targets
+
+      - name: Re-run previously certified revision-consistency scanner
+        run: cargo +1.95.0 test --manifest-path certification/ores-cli-tjsv-workflow-revision/Cargo.toml --all-targets
+
+      - name: Prove tracked certificate sources remained immutable
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git hash-object "$CERT_ROOT/src/tjsv_invocation_scope.rs")" = "$ORES_CLI_SCOPE_MODULE_BLOB"
+          test "$(git hash-object "$CERT_ROOT/product-audit-mod.rs")" = "$ORES_CLI_AUDIT_MOD_BLOB"
+          git diff --exit-code -- "$CERT_ROOT" .github/workflows/ores-cli-tjsv-command-scope.yml
