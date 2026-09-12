@@ -60,7 +60,11 @@ jobs:
               .authorityModel.typespecProjection == "generated-json-schema-b" and
               .authorityModel.generatedJsonSchema == "comparison-evidence-only" and
               .authorityModel.comparison == "generated-b-vs-authored-a" and
-              .authorityModel.precedence == "none"
+              .authorityModel.precedence == "none" and
+              .composition.oauthProviderLintPreserved == true and
+              .composition.fullCheckPreserved == true and
+              .composition.revisionConsistencyPreserved == true and
+              .composition.crossStepStitchingRejected == true
             ' "$lock"
           grep -Fqx 'mod oauth_provider_contract;' "$dispatcher"
           grep -Fqx 'mod tjsv_bidirectional_drift;' "$dispatcher"

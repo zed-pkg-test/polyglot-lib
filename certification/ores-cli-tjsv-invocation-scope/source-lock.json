@@ -14,5 +14,11 @@
     "generatedJsonSchema": "comparison-evidence-only",
     "comparison": "generated-b-vs-authored-a",
     "precedence": "none"
+  },
+  "composition": {
+    "oauthProviderLintPreserved": true,
+    "fullCheckPreserved": true,
+    "revisionConsistencyPreserved": true,
+    "crossStepStitchingRejected": true
   }
 }
