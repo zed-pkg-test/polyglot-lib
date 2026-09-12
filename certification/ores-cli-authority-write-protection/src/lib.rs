@@ -67,6 +67,7 @@ pub mod model {
 
 pub mod audit {
     use super::PathBuf;
+    use crate::model::CommandReport;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct RepositoryAuditOptions {
@@ -77,5 +78,14 @@ pub mod audit {
 
     mod authority_write_protection;
 
-    pub use authority_write_protection::augment_authority_write_protection_audit;
+    pub fn run(path: PathBuf) -> CommandReport {
+        authority_write_protection::augment_authority_write_protection_audit(
+            &RepositoryAuditOptions {
+                path,
+                profile: "baseline".to_owned(),
+                additional_required_paths: Vec::new(),
+            },
+            CommandReport::new("audit repo"),
+        )
+    }
 }
