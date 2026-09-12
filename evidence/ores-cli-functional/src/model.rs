@@ -30,11 +30,7 @@ impl Finding {
         Self::new(Severity::Error, code, message)
     }
 
-    fn new(
-        severity: Severity,
-        code: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    fn new(severity: Severity, code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             severity,
             code: code.into(),
