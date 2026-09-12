@@ -25,6 +25,8 @@ env:
   LOCKFILE: certification/ores-cli-tjsv-full-check/Cargo.lock
   SOURCE_LOCK: certification/ores-cli-tjsv-full-check/source-lock.json
   MIRROR: certification/ores-cli-tjsv-full-check/src/tjsv_full_check.rs
+  PRODUCT_TESTS: certification/ores-cli-tjsv-full-check/src/audit/tjsv_full_check_tests.rs
+  PRODUCT_AUDIT_MOD: certification/ores-cli-tjsv-full-check/product-audit-mod.rs
 
 jobs:
   certify:
@@ -43,7 +45,7 @@ jobs:
         with:
           args: .github/workflows/ores-cli-tjsv-full-check-certificate.yml
 
-      - name: Verify exact candidate and provenance boundary
+      - name: Verify exact candidate provenance tests and audit wiring
         shell: bash
         run: |
           set -euo pipefail
@@ -53,20 +55,34 @@ jobs:
           jq -e '
             .schema == "zed-pkg-test.ores-cli-tjsv-full-check/v1" and
             .upstream.repository == "ORESoftware/ores-cli" and
-            .upstream.pullRequest == 177 and
-            .upstream.head == "6e29a4e0650ef2fd84432b835caf16810710b6bf" and
+            .upstream.pullRequest == 223 and
+            .upstream.head == "abe5f6740f937b2e545d41463a1a5c75c7159a44" and
             .upstream.path == "src/audit/tjsv_full_check.rs" and
-            .upstream.blob == "60e851132201be94fdd14d92939e88600c74adc7" and
+            .upstream.blob == "a99fb6989e78ac043c485cc62b5ea46a7919639e" and
             .mirror.path == "src/tjsv_full_check.rs" and
-            (.mirror.blob | test("^[0-9a-f]{40}$")) and
-            .mirror.scope == "executable-production-prefix-before-cfg-test-module" and
+            .mirror.blob == "a99fb6989e78ac043c485cc62b5ea46a7919639e" and
+            .mirror.scope == "exact-upstream-file" and
+            .productIntegration.auditModule.upstreamPath == "src/audit/mod.rs" and
+            .productIntegration.auditModule.mirrorPath == "product-audit-mod.rs" and
+            .productIntegration.auditModule.blob == "37bd7064652b3ef17f75b716777728ed39c7b0d2" and
+            .productIntegration.regressionTests.upstreamPath == "src/audit/tjsv_full_check_tests.rs" and
+            .productIntegration.regressionTests.mirrorPath == "src/audit/tjsv_full_check_tests.rs" and
+            .productIntegration.regressionTests.blob == "0c9b7040c1596121ea91af8d45e51ea8299f386b" and
             .contract.typespecAuthority == "independently-authored" and
             .contract.jsonSchemaAuthority == "independently-authored" and
             .contract.generatedJsonSchemaRole == "comparison-evidence-only" and
             .contract.authorityPrecedence == "none"
           ' "$SOURCE_LOCK"
-          expected_mirror="$(jq -r '.mirror.blob' "$SOURCE_LOCK")"
-          test "$(git hash-object "$MIRROR")" = "$expected_mirror"
+          test "$(git hash-object "$MIRROR")" = 'a99fb6989e78ac043c485cc62b5ea46a7919639e'
+          test "$(git hash-object "$PRODUCT_TESTS")" = '0c9b7040c1596121ea91af8d45e51ea8299f386b'
+          test "$(git hash-object "$PRODUCT_AUDIT_MOD")" = '37bd7064652b3ef17f75b716777728ed39c7b0d2'
+          grep -Fqx 'mod tjsv_full_check;' "$PRODUCT_AUDIT_MOD"
+          grep -Fqx 'mod tjsv_full_check_tests;' "$PRODUCT_AUDIT_MOD"
+          generated_line="$(grep -nF 'contract_generated_evidence::augment_contract_generated_evidence_audit(' "$PRODUCT_AUDIT_MOD" | head -1 | cut -d: -f1)"
+          full_line="$(grep -nF 'tjsv_full_check::augment_tjsv_full_check_audit(options, report)' "$PRODUCT_AUDIT_MOD" | head -1 | cut -d: -f1)"
+          drift_line="$(grep -nF 'tjsv_bidirectional_drift::augment_tjsv_bidirectional_drift_audit(options, report)' "$PRODUCT_AUDIT_MOD" | head -1 | cut -d: -f1)"
+          test "$generated_line" -lt "$full_line"
+          test "$full_line" -lt "$drift_line"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
@@ -84,13 +100,13 @@ jobs:
       - name: Check formatting
         run: cargo fmt --manifest-path "$MANIFEST" -- --check
 
-      - name: Compile and execute production scanner plus adversarial cases
+      - name: Compile and execute exact product regressions plus adversarial cases
         run: cargo test --manifest-path "$MANIFEST" --all-targets --locked
 
       - name: Lint certificate harness
         run: cargo clippy --manifest-path "$MANIFEST" --all-targets --locked -- -D warnings
 
-      - name: Prove source mirror, lock, and harness stayed immutable
+      - name: Prove source mirrors lock and harness stayed immutable
         run: |
           set -euo pipefail
           git diff --check
@@ -98,6 +114,7 @@ jobs:
             certification/ores-cli-tjsv-full-check/Cargo.toml \
             certification/ores-cli-tjsv-full-check/Cargo.lock \
             certification/ores-cli-tjsv-full-check/source-lock.json \
+            certification/ores-cli-tjsv-full-check/product-audit-mod.rs \
             certification/ores-cli-tjsv-full-check/src
           test -z "$(git status --porcelain --untracked-files=no)"
 
