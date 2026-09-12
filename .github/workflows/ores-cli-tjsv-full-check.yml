@@ -43,6 +43,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test -d certification/ores-cli-tjsv-full-check/src/audit
+          test -s certification/ores-cli-tjsv-full-check/src/audit/README.md
           jq -e '
             .schema == "zed-pkg-test.ores-cli-tjsv-full-check/v1" and
             .upstream.repository == "ORESoftware/ores-cli" and
@@ -72,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s "$LOCKFILE"
-          cargo metadata --manifest-path "$MANIFEST" --locked --no-deps > /dev/null
+          cargo metadata --manifest-path "$MANIFEST" --locked --no-deps --format-version 1 > /dev/null
 
       - name: Check formatting
         run: cargo fmt --manifest-path "$MANIFEST" -- --check
