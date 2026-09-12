@@ -1,0 +1,16 @@
+{
+  "schema": "ores.test-source-lock/v1",
+  "repository": "ORESoftware/ores-cli",
+  "pullRequest": 216,
+  "commit": "7cd37926e3eb520eec27b95ff27b738ad87e62b8",
+  "files": {
+    "src/audit/tjsv_workflow_revision.rs": "8f3fadfad66824e84e03b9f342a96efbf673102b",
+    "src/audit/mod.rs": "01c2fe8155ce2cb25c5133646d4be6da1c1e3e58"
+  },
+  "authorityModel": {
+    "typespec": "independently-authored-first-class",
+    "jsonSchema": "independently-authored-first-class",
+    "generatedJsonSchema": "comparison-evidence-only",
+    "precedence": "none"
+  }
+}
