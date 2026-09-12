@@ -1,0 +1,49 @@
+name: DEN-3043 ores-cli functional-lint source proof
+
+on:
+  pull_request:
+    paths:
+      - "evidence/ores-cli-functional/**"
+      - ".github/workflows/den-3043-ores-cli-functional-proof.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact production lint blob
+        run: |
+          set -euo pipefail
+          test "$(git hash-object evidence/ores-cli-functional/src/audit/functional_style.rs)" = "37e56c54dec1d4ffdfd697d4e1b2596b5edd303e"
+      - name: Verify evidence harness conflict hygiene
+        run: |
+          set -euo pipefail
+          git diff --check
+          status=0
+          git grep -n -I -E '^(<<<<<<< .+|=======|>>>>>>> .+)$' -- \
+            evidence/ores-cli-functional/Cargo.toml \
+            evidence/ores-cli-functional/src/lib.rs \
+            evidence/ores-cli-functional/src/model.rs || status=$?
+          test "$status" -eq 1
+      - name: Install Rust 1.88
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: "1.88.0"
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --manifest-path evidence/ores-cli-functional/Cargo.toml --all -- --check
+      - name: Compile all targets
+        run: cargo check --manifest-path evidence/ores-cli-functional/Cargo.toml --all-targets
+      - name: Run exact-source tests
+        run: cargo test --manifest-path evidence/ores-cli-functional/Cargo.toml
+      - name: Reject Clippy warnings
+        run: cargo clippy --manifest-path evidence/ores-cli-functional/Cargo.toml --all-targets -- -D warnings
