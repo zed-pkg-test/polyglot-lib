@@ -89,6 +89,7 @@ pub mod model {
 
 pub mod audit {
     use super::PathBuf;
+    use crate::model::CommandReport;
 
     #[derive(Debug, Clone)]
     pub struct RepositoryAuditOptions {
@@ -101,14 +102,26 @@ pub mod audit {
         include!("tjsv_full_check.rs");
     }
 
+    /// Execute the exact mirrored production scanner through a non-test API.
+    #[must_use]
+    pub fn certify_repository(path: PathBuf) -> CommandReport {
+        tjsv_full_check::augment_tjsv_full_check_audit(
+            &RepositoryAuditOptions {
+                path,
+                profile: "baseline".to_owned(),
+                additional_required_paths: Vec::new(),
+            },
+            CommandReport::new("certify ores-cli TJSV full-check lint"),
+        )
+    }
+
     #[cfg(test)]
     mod certification_tests {
         use std::fs;
 
         use tempfile::tempdir;
 
-        use super::RepositoryAuditOptions;
-        use super::tjsv_full_check::augment_tjsv_full_check_audit;
+        use super::certify_repository;
         use crate::model::CommandReport;
 
         fn audit(workflow: &str) -> CommandReport {
@@ -129,14 +142,7 @@ pub mod audit {
             fs::create_dir_all(&workflows).expect("workflow directory");
             fs::write(workflows.join("contracts.yml"), workflow).expect("workflow");
 
-            augment_tjsv_full_check_audit(
-                &RepositoryAuditOptions {
-                    path: root.path().to_path_buf(),
-                    profile: "baseline".to_owned(),
-                    additional_required_paths: Vec::new(),
-                },
-                CommandReport::new("audit repo"),
-            )
+            certify_repository(root.path().to_path_buf())
         }
 
         #[test]
