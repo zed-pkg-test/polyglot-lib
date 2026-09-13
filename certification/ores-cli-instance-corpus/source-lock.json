@@ -1,0 +1,24 @@
+{
+  "schema": "ores.test.source-lock/v1",
+  "repository": "ORESoftware/ores-cli",
+  "pullRequest": 274,
+  "commit": "565c4dfd3dfa85cfc197f5629f1894ecd4b97b1d",
+  "revisionRole": "product-candidate-head",
+  "focus": "src/audit/contract_instance_corpus.rs",
+  "focusBlob": "66ded46759f5404c379d5fea16d3ee2ac0eb65e5",
+  "authorityModel": {
+    "typespec": "independently-authored-first-class",
+    "jsonSchema": "independently-authored-draft-2020-12-first-class",
+    "typespecProjection": "generated-json-schema-b",
+    "generatedJsonSchema": "comparison-evidence-only",
+    "comparison": "generated-b-vs-authored-a",
+    "precedence": "none"
+  },
+  "corpusPolicy": {
+    "pairedValidInvalidClasses": true,
+    "jsonDecodable": true,
+    "bounded": true,
+    "noSymlinks": true,
+    "semanticAdmissionOwnedByTjsv": true
+  }
+}
