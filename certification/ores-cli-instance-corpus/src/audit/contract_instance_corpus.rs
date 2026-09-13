@@ -197,29 +197,19 @@ pub(super) fn augment_contract_instance_corpus_audit(
                 report.push(
                     Finding::error(
                         "contract-instance-fixture-class-missing",
-                        format!(
-                            "paired TJSV corpus is missing its {missing} fixture directory"
-                        ),
+                        format!("paired TJSV corpus is missing its {missing} fixture directory"),
                     )
                     .with_target(model_target),
                 );
             }
 
             if valid_state.auditable {
-                valid_fixture_count += audit_fixture_class(
-                    &options.path,
-                    &valid,
-                    VALID_DIRECTORY,
-                    &mut report,
-                );
+                valid_fixture_count +=
+                    audit_fixture_class(&options.path, &valid, VALID_DIRECTORY, &mut report);
             }
             if invalid_state.auditable {
-                invalid_fixture_count += audit_fixture_class(
-                    &options.path,
-                    &invalid,
-                    INVALID_DIRECTORY,
-                    &mut report,
-                );
+                invalid_fixture_count +=
+                    audit_fixture_class(&options.path, &invalid, INVALID_DIRECTORY, &mut report);
             }
         }
     }
@@ -463,7 +453,7 @@ mod tests {
     use serde_json::Value as JsonValue;
     use tempfile::tempdir;
 
-    use super::{MAX_FIXTURE_BYTES, augment_contract_instance_corpus_audit};
+    use super::{augment_contract_instance_corpus_audit, MAX_FIXTURE_BYTES};
     use crate::audit::RepositoryAuditOptions;
     use crate::model::CommandReport;
 
@@ -535,9 +525,10 @@ mod tests {
             let model = contract.join("instances/ReadinessOfferingCatalog");
             write_fixture(&model.join("valid"), "catalog.json", r#"{"tiers":[]}"#);
         });
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == "contract-instance-fixture-class-missing"
-        }));
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| { finding.code == "contract-instance-fixture-class-missing" }));
     }
 
     #[test]
@@ -583,9 +574,10 @@ mod tests {
             .expect("oversized fixture");
             write_fixture(&model.join("invalid"), "negative.json", r#"{"bad":true}"#);
         });
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == "contract-instance-fixture-too-large"
-        }));
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| { finding.code == "contract-instance-fixture-too-large" }));
     }
 
     #[cfg(unix)]
@@ -602,8 +594,9 @@ mod tests {
             symlink(valid.join("canonical.json"), valid.join("alias.json"))
                 .expect("fixture symlink");
         });
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == "contract-instance-fixture-symlink"
-        }));
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| { finding.code == "contract-instance-fixture-symlink" }));
     }
 }
