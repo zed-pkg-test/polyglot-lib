@@ -1,0 +1,53 @@
+name: ores-cli AI thread broadcast canary
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ores-cli-ai-thread-broadcast.yml'
+      - 'certification/ores-cli-ai-thread-broadcast/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-ai-thread-broadcast-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact test head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/ores-cli-ai-thread-broadcast.yml
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.95.0'
+          components: rustfmt, clippy
+
+      - name: Require provider module formatting
+        run: rustfmt +1.95.0 --edition 2024 --check certification/ores-cli-ai-thread-broadcast/src/ai.rs
+
+      - name: Compile isolated provider module
+        run: cargo +1.95.0 check --manifest-path certification/ores-cli-ai-thread-broadcast/Cargo.toml --all-targets
+
+      - name: Run embedded provider regressions
+        run: cargo +1.95.0 test --manifest-path certification/ores-cli-ai-thread-broadcast/Cargo.toml --all-targets -- --nocapture
+
+      - name: Deny warnings under Clippy
+        run: cargo +1.95.0 clippy --manifest-path certification/ores-cli-ai-thread-broadcast/Cargo.toml --all-targets -- -D warnings
+
+      - name: Repeat provider regressions optimized
+        run: cargo +1.95.0 test --release --manifest-path certification/ores-cli-ai-thread-broadcast/Cargo.toml --all-targets
