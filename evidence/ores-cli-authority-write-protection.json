@@ -1,0 +1,17 @@
+{
+  "schema": "ores.test.exact-source-certification/v1",
+  "repository": "ORESoftware/ores-cli",
+  "pullRequest": 269,
+  "productHead": "542fc4952fe111b306a026f7997f85c155fcc04b",
+  "sourcePath": "src/audit/authority_write_protection.rs",
+  "sourceBlob": "ff68af00ebf17a86d30b27a61dfd6ba26f5824fb",
+  "dispatcherPath": "src/audit/mod.rs",
+  "dispatcherBlob": "04c11a5b29cc80a176598f07af81bd89ccd3584a",
+  "authority": {
+    "typespec": "independent-first-class",
+    "jsonSchema": "independent-draft-2020-12-first-class",
+    "generatedSchemaB": "comparison-evidence-only",
+    "precedence": "none"
+  },
+  "policy": "automation-must-not-overwrite-authored-peer-authorities"
+}
