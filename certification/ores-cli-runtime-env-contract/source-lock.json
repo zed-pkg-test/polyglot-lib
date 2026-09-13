@@ -1,0 +1,17 @@
+{
+  "schema": "ores.test.source-lock/v1",
+  "repository": "ORESoftware/ores-cli",
+  "pullRequest": 277,
+  "productHead": "2465cad4df82f02ca5a4b01b4838e9a4b84b4ac5",
+  "files": {
+    "src/audit/runtime_env_contract.rs": "de00ea4c9d79c4c8b9da59a11b22737df42f9ec9"
+  },
+  "authorityModel": {
+    "cliFlags": "flags2env-public-and-control-authority",
+    "runtimeTomls": "registered-runtime-policy-authority",
+    "sourceAst": "verification-only",
+    "derivedInventory": "evidence-only",
+    "valuesRead": false,
+    "literalDefaultsRead": false
+  }
+}
