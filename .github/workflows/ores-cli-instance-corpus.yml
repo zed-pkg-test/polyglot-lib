@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ORES_CLI_CANDIDATE: 565c4dfd3dfa85cfc197f5629f1894ecd4b97b1d
-  ORES_CLI_CORPUS_BLOB: 66ded46759f5404c379d5fea16d3ee2ac0eb65e5
+  ORES_CLI_CANDIDATE: f27536998c802dade5ba23890a4e90774def185f
+  ORES_CLI_CORPUS_BLOB: 40eb6e470bf20c8723ca366d0f0d61ab54137a1c
   CERT_ROOT: certification/ores-cli-instance-corpus
 
 jobs:
