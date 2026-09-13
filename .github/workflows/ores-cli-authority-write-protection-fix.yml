@@ -1,0 +1,107 @@
+name: ores-cli authority write-protection repair
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ores-cli-authority-write-protection-fix.yml'
+      - 'certification/ores-cli-authority-write-protection-fix/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-authority-write-protection-fix-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORES_CLI_CANDIDATE: dafa0977dd030c3d8b85f09e5902ffda745c0910
+  CERT_ROOT: certification/ores-cli-authority-write-protection-fix
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact test head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate workflow and source lock
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/ores-cli-authority-write-protection-fix.yml
+
+      - name: Prove first-class peer authority policy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          jq -e --arg sha "$ORES_CLI_CANDIDATE" '
+            .schema == "ores.test.source-lock/v1" and
+            .repository == "ORESoftware/ores-cli" and
+            .pullRequest == 276 and
+            .commit == $sha and
+            .authorityModel.typespec == "independently-authored-first-class" and
+            .authorityModel.jsonSchema == "independently-authored-draft-2020-12-first-class" and
+            .authorityModel.typespecProjection == "generated-json-schema-b" and
+            .authorityModel.generatedJsonSchema == "comparison-evidence-only" and
+            .authorityModel.comparison == "generated-b-vs-authored-a" and
+            .authorityModel.precedence == "none"
+          ' "$CERT_ROOT/source-lock.json"
+
+      - name: Fetch exact public product head without credentials
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir product
+          git -C product init -q
+          git -C product remote add origin https://github.com/ORESoftware/ores-cli.git
+          git -C product -c credential.helper= fetch --depth=1 origin "$ORES_CLI_CANDIDATE"
+          git -C product checkout -q --detach FETCH_HEAD
+          test "$(git -C product rev-parse HEAD)" = "$ORES_CLI_CANDIDATE"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.95.0'
+          components: rustfmt, clippy
+
+      - name: Require formatting
+        working-directory: product
+        run: cargo +1.95.0 fmt --all -- --check
+
+      - name: Deny warnings across all targets
+        working-directory: product
+        run: cargo +1.95.0 clippy --all-targets --all-features --locked -- -D warnings
+
+      - name: Run library regression suite
+        working-directory: product
+        run: cargo +1.95.0 test --lib --all-features --locked
+
+      - name: Run focused authority-write regressions
+        working-directory: product
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cargo +1.95.0 test --lib --all-features --locked authority_write_protection -- --nocapture
+          grep -Fq 'allows_copying_authored_peers_into_negative_control_fixtures' src/audit/authority_write_protection.rs
+          grep -Fq 'still_rejects_copy_move_and_install_that_can_replace_authored_peers' src/audit/authority_write_protection.rs
+
+      - name: Require real repository self-audit to pass
+        working-directory: product
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cargo +1.95.0 run --locked -- audit repo --path . --profile baseline > ../audit.ndjson
+          ! grep -Fq 'peer-authority-direct-write' ../audit.ndjson
+
+      - name: Prove product checkout remained immutable
+        working-directory: product
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$ORES_CLI_CANDIDATE"
+          test -z "$(git status --porcelain --untracked-files=no)"
