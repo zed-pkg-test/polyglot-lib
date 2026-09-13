@@ -6,6 +6,10 @@
   "revisionRole": "product-candidate-head",
   "focus": "src/audit/contract_instance_corpus.rs",
   "focusBlob": "66ded46759f5404c379d5fea16d3ee2ac0eb65e5",
+  "certificate": {
+    "mode": "byte-identical-product-mirror",
+    "mirrorPath": "certification/ores-cli-instance-corpus/src/audit/contract_instance_corpus.rs"
+  },
   "authorityModel": {
     "typespec": "independently-authored-first-class",
     "jsonSchema": "independently-authored-draft-2020-12-first-class",
