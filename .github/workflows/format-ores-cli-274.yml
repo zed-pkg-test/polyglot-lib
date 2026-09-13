@@ -1,0 +1,42 @@
+name: Temporary Rustfmt ores-cli 274
+
+on:
+  push:
+    branches:
+      - automation/format-ores-cli-274
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out formatter branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: automation/format-ores-cli-274
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Install exact Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.95.0'
+          components: rustfmt
+      - name: Format exact mirrored product module and commit result
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          module='certification/ores-cli-instance-corpus/src/audit/contract_instance_corpus.rs'
+          rustfmt +1.95.0 "$module"
+          if git diff --quiet -- "$module"; then
+            echo 'already formatted'
+            exit 0
+          fi
+          git config user.name 'ores-test-format-bot'
+          git config user.email 'ores-test-format-bot@users.noreply.github.com'
+          git add "$module"
+          git commit -m 'chore: rustfmt exact ores-cli 274 module'
+          git push origin HEAD:automation/format-ores-cli-274
