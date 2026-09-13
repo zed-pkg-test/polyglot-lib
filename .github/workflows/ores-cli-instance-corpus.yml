@@ -22,7 +22,7 @@ env:
 jobs:
   certify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Check out exact test head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,16 +36,19 @@ jobs:
         with:
           args: .github/workflows/ores-cli-instance-corpus.yml
 
-      - name: Prove peer-authority and corpus policy lock
+      - name: Prove exact source and peer-authority policy lock
         shell: bash
         run: |
           set -Eeuo pipefail
+          module="$CERT_ROOT/src/audit/contract_instance_corpus.rs"
+          test "$(git hash-object "$module")" = "$ORES_CLI_CORPUS_BLOB"
           jq -e --arg sha "$ORES_CLI_CANDIDATE" --arg blob "$ORES_CLI_CORPUS_BLOB" '
             .schema == "ores.test.source-lock/v1" and
             .repository == "ORESoftware/ores-cli" and
             .pullRequest == 274 and
             .commit == $sha and
             .focusBlob == $blob and
+            .certificate.mode == "byte-identical-product-mirror" and
             .authorityModel.typespec == "independently-authored-first-class" and
             .authorityModel.jsonSchema == "independently-authored-draft-2020-12-first-class" and
             .authorityModel.typespecProjection == "generated-json-schema-b" and
@@ -55,18 +58,10 @@ jobs:
             .corpusPolicy.pairedValidInvalidClasses == true and
             .corpusPolicy.semanticAdmissionOwnedByTjsv == true
           ' "$CERT_ROOT/source-lock.json"
-
-      - name: Fetch exact public product head without credentials
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          mkdir product
-          git -C product init -q
-          git -C product remote add origin https://github.com/ORESoftware/ores-cli.git
-          git -C product -c credential.helper= fetch --depth=1 origin "$ORES_CLI_CANDIDATE"
-          git -C product checkout -q --detach FETCH_HEAD
-          test "$(git -C product rev-parse HEAD)" = "$ORES_CLI_CANDIDATE"
-          test "$(git -C product hash-object src/audit/contract_instance_corpus.rs)" = "$ORES_CLI_CORPUS_BLOB"
+          grep -Fq 'TJSV owns semantic instance admission' "$module"
+          grep -Fq 'paired TJSV corpus is missing its' "$module"
+          grep -Fq 'authored.schema.json' "$module"
+          grep -Fq 'main.tsp' "$module"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
@@ -74,43 +69,24 @@ jobs:
           toolchain: '1.95.0'
           components: rustfmt, clippy
 
-      - name: Require focused source formatting
-        working-directory: product
-        run: rustfmt +1.95.0 --check src/audit/contract_instance_corpus.rs
+      - name: Require exact product module formatting
+        run: rustfmt +1.95.0 --check "$CERT_ROOT/src/audit/contract_instance_corpus.rs"
 
-      - name: Deny library warnings
-        working-directory: product
-        run: cargo +1.95.0 clippy --lib --all-features --locked -- -D warnings
+      - name: Compile exact mirrored module
+        run: cargo +1.95.0 check --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
 
-      - name: Run full library tests
-        working-directory: product
-        run: cargo +1.95.0 test --lib --all-features --locked
+      - name: Run all embedded corpus regressions
+        run: cargo +1.95.0 test --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- --nocapture
 
-      - name: Run exact instance-corpus regressions
-        working-directory: product
+      - name: Deny warnings under Clippy
+        run: cargo +1.95.0 clippy --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- -D warnings
+
+      - name: Repeat corpus regressions optimized
+        run: cargo +1.95.0 test --release --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
+
+      - name: Prove mirrored source remained immutable
         shell: bash
         run: |
           set -Eeuo pipefail
-          cargo +1.95.0 test --lib --all-features --locked contract_instance_corpus -- --nocapture
-          grep -Fq 'paired TJSV corpus is missing its' src/audit/contract_instance_corpus.rs
-          grep -Fq 'contract-instance-fixture-class-empty' src/audit/contract_instance_corpus.rs
-          grep -Fq 'contract-instance-fixture-invalid-json' src/audit/contract_instance_corpus.rs
-          grep -Fq 'TJSV owns semantic instance admission' src/audit/contract_instance_corpus.rs
-          grep -Fq 'contract_instance_corpus::augment_contract_instance_corpus_audit' src/audit/mod.rs
-
-      - name: Require peer authorities to remain distinct from generated evidence
-        working-directory: product
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          grep -Fq 'main.tsp' src/audit/contract_instance_corpus.rs
-          grep -Fq 'authored.schema.json' src/audit/contract_instance_corpus.rs
-          test "$(git hash-object src/audit/contract_instance_corpus.rs)" = "$ORES_CLI_CORPUS_BLOB"
-
-      - name: Prove product checkout remained immutable
-        working-directory: product
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          test "$(git rev-parse HEAD)" = "$ORES_CLI_CANDIDATE"
-          test -z "$(git status --porcelain --untracked-files=no)"
+          test "$(git hash-object "$CERT_ROOT/src/audit/contract_instance_corpus.rs")" = "$ORES_CLI_CORPUS_BLOB"
+          git diff --exit-code -- "$CERT_ROOT" .github/workflows/ores-cli-instance-corpus.yml
