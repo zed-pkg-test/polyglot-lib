@@ -373,7 +373,8 @@ fn read_bounded_toml(path: &Path) -> Option<Value> {
     {
         return None;
     }
-    fs::read_to_string(path).ok()?.parse::<Value>().ok()
+    let text = fs::read_to_string(path).ok()?;
+    toml::from_str::<Value>(&text).ok()
 }
 
 fn normalize_type(value: &str) -> Option<&'static str> {
