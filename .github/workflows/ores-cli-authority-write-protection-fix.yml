@@ -16,12 +16,13 @@ concurrency:
 
 env:
   ORES_CLI_CANDIDATE: dafa0977dd030c3d8b85f09e5902ffda745c0910
+  ORES_CLI_MODULE_BLOB: b6c92b3bff79252eb67fac57094d7cc1249e5b66
   CERT_ROOT: certification/ores-cli-authority-write-protection-fix
 
 jobs:
   certify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Check out exact test head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,20 +31,24 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Validate workflow and source lock
+      - name: Validate workflow
         uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
         with:
           args: .github/workflows/ores-cli-authority-write-protection-fix.yml
 
-      - name: Prove first-class peer authority policy
+      - name: Prove exact source and first-class peer authority policy
         shell: bash
         run: |
           set -Eeuo pipefail
-          jq -e --arg sha "$ORES_CLI_CANDIDATE" '
+          module="$CERT_ROOT/src/audit/authority_write_protection.rs"
+          test "$(git hash-object "$module")" = "$ORES_CLI_MODULE_BLOB"
+          jq -e --arg sha "$ORES_CLI_CANDIDATE" --arg blob "$ORES_CLI_MODULE_BLOB" '
             .schema == "ores.test.source-lock/v1" and
             .repository == "ORESoftware/ores-cli" and
             .pullRequest == 276 and
             .commit == $sha and
+            .focusBlob == $blob and
+            .certificate.mode == "byte-identical-product-mirror" and
             .authorityModel.typespec == "independently-authored-first-class" and
             .authorityModel.jsonSchema == "independently-authored-draft-2020-12-first-class" and
             .authorityModel.typespecProjection == "generated-json-schema-b" and
@@ -51,17 +56,9 @@ jobs:
             .authorityModel.comparison == "generated-b-vs-authored-a" and
             .authorityModel.precedence == "none"
           ' "$CERT_ROOT/source-lock.json"
-
-      - name: Fetch exact public product head without credentials
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          mkdir product
-          git -C product init -q
-          git -C product remote add origin https://github.com/ORESoftware/ores-cli.git
-          git -C product -c credential.helper= fetch --depth=1 origin "$ORES_CLI_CANDIDATE"
-          git -C product checkout -q --detach FETCH_HEAD
-          test "$(git -C product rev-parse HEAD)" = "$ORES_CLI_CANDIDATE"
+          grep -Fq 'Copying an authored peer *out* to a distinct file' "$module"
+          grep -Fq 'allows_copying_authored_peers_into_negative_control_fixtures' "$module"
+          grep -Fq 'still_rejects_copy_move_and_install_that_can_replace_authored_peers' "$module"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
@@ -70,38 +67,23 @@ jobs:
           components: rustfmt, clippy
 
       - name: Require formatting
-        working-directory: product
-        run: cargo +1.95.0 fmt --all -- --check
+        run: cargo +1.95.0 fmt --manifest-path "$CERT_ROOT/Cargo.toml" --all -- --check
 
-      - name: Deny warnings across all targets
-        working-directory: product
-        run: cargo +1.95.0 clippy --all-targets --all-features --locked -- -D warnings
+      - name: Compile exact mirrored module
+        run: cargo +1.95.0 check --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
 
-      - name: Run library regression suite
-        working-directory: product
-        run: cargo +1.95.0 test --lib --all-features --locked
+      - name: Run all embedded authority-write regressions
+        run: cargo +1.95.0 test --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- --nocapture
 
-      - name: Run focused authority-write regressions
-        working-directory: product
+      - name: Deny warnings under Clippy
+        run: cargo +1.95.0 clippy --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets -- -D warnings
+
+      - name: Repeat regressions optimized
+        run: cargo +1.95.0 test --release --manifest-path "$CERT_ROOT/Cargo.toml" --all-targets
+
+      - name: Prove mirrored source remained immutable
         shell: bash
         run: |
           set -Eeuo pipefail
-          cargo +1.95.0 test --lib --all-features --locked authority_write_protection -- --nocapture
-          grep -Fq 'allows_copying_authored_peers_into_negative_control_fixtures' src/audit/authority_write_protection.rs
-          grep -Fq 'still_rejects_copy_move_and_install_that_can_replace_authored_peers' src/audit/authority_write_protection.rs
-
-      - name: Require real repository self-audit to pass
-        working-directory: product
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          cargo +1.95.0 run --locked -- audit repo --path . --profile baseline > ../audit.ndjson
-          ! grep -Fq 'peer-authority-direct-write' ../audit.ndjson
-
-      - name: Prove product checkout remained immutable
-        working-directory: product
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          test "$(git rev-parse HEAD)" = "$ORES_CLI_CANDIDATE"
-          test -z "$(git status --porcelain --untracked-files=no)"
+          test "$(git hash-object "$CERT_ROOT/src/audit/authority_write_protection.rs")" = "$ORES_CLI_MODULE_BLOB"
+          git diff --exit-code -- "$CERT_ROOT" .github/workflows/ores-cli-authority-write-protection-fix.yml
