@@ -40,6 +40,9 @@ jobs:
       - name: Format provider module for compile canary
         run: rustfmt +1.95.0 --edition 2024 certification/ores-cli-ai-thread-broadcast/src/ai.rs
 
+      - name: Require CLI adapter formatting
+        run: rustfmt +1.95.0 --edition 2024 --check certification/ores-cli-ai-thread-broadcast/src/ai_cli.rs
+
       - name: Compile isolated provider module
         run: cargo +1.95.0 check --manifest-path certification/ores-cli-ai-thread-broadcast/Cargo.toml --all-targets
 
