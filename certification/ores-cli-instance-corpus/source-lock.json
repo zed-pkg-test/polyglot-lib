@@ -2,10 +2,10 @@
   "schema": "ores.test.source-lock/v1",
   "repository": "ORESoftware/ores-cli",
   "pullRequest": 274,
-  "commit": "565c4dfd3dfa85cfc197f5629f1894ecd4b97b1d",
+  "commit": "f27536998c802dade5ba23890a4e90774def185f",
   "revisionRole": "product-candidate-head",
   "focus": "src/audit/contract_instance_corpus.rs",
-  "focusBlob": "66ded46759f5404c379d5fea16d3ee2ac0eb65e5",
+  "focusBlob": "40eb6e470bf20c8723ca366d0f0d61ab54137a1c",
   "certificate": {
     "mode": "byte-identical-product-mirror",
     "mirrorPath": "certification/ores-cli-instance-corpus/src/audit/contract_instance_corpus.rs"
