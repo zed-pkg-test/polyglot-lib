@@ -12,8 +12,8 @@ permissions:
 
 env:
   CERT_ROOT: certification/ores-cli-runtime-env-contract
-  PRODUCT_HEAD: 3c63c5220cb19e7756ad18e52a91346e20bdb347
-  PRODUCT_BLOB: a05ce61ca987d3c8174edc8025a7f72217c9aa58
+  PRODUCT_HEAD: 2465cad4df82f02ca5a4b01b4838e9a4b84b4ac5
+  PRODUCT_BLOB: de00ea4c9d79c4c8b9da59a11b22737df42f9ec9
 
 jobs:
   certify-exact-source:
