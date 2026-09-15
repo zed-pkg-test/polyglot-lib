@@ -33,15 +33,9 @@ struct ResolvedValues {
         default = "default_inactive_days"
     )]
     inactive_days: u64,
-    #[serde(
-        rename = "ORES_CLI_AI_MAX_THREADS",
-        default = "default_max_threads"
-    )]
+    #[serde(rename = "ORES_CLI_AI_MAX_THREADS", default = "default_max_threads")]
     max_threads: usize,
-    #[serde(
-        rename = "ORES_CLI_AI_CONCURRENCY",
-        default = "default_concurrency"
-    )]
+    #[serde(rename = "ORES_CLI_AI_CONCURRENCY", default = "default_concurrency")]
     concurrency: usize,
     #[serde(rename = "ORES_CLI_AI_PROMPT", default)]
     prompt: String,
@@ -138,14 +132,10 @@ pub async fn run_process(argv: &[String]) -> Result<u8, RuntimeError> {
         [ai, threads] if ai == "ai" && threads == "threads" => {
             list_threads(&build_query(&values, provider)).await?
         }
-        [ai, threads, list]
-            if ai == "ai" && threads == "threads" && list == "list" =>
-        {
+        [ai, threads, list] if ai == "ai" && threads == "threads" && list == "list" => {
             list_threads(&build_query(&values, provider)).await?
         }
-        [ai, threads, prompt]
-            if ai == "ai" && threads == "threads" && prompt == "prompt" =>
-        {
+        [ai, threads, prompt] if ai == "ai" && threads == "threads" && prompt == "prompt" => {
             let options = ThreadPromptOptions {
                 query: build_query(&values, provider),
                 prompt: values.prompt,
