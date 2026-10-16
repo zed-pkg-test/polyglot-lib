@@ -1,3 +1,5 @@
+#![allow(clippy::needless_return)] // Workspace style requires explicit named-function returns.
+
 use std::{
     collections::BTreeSet,
     fs,
