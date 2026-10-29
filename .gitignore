@@ -13,3 +13,6 @@ tmp
 temp
 tmp/worktrees
 temp/worktrees
+tmp/
+temp/
+tools/language-layout/target/
